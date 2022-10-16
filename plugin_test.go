@@ -148,7 +148,7 @@ func TestDeepGorm_Initialize_TriggersFilteringCorrectly(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			db := newDatabase(t)
+			db := newDatabase(t).Debug()
 			_ = db.AutoMigrate(&ObjectA{}, &ObjectB{})
 			plugin := New()
 
@@ -164,7 +164,9 @@ func TestDeepGorm_Initialize_TriggersFilteringCorrectly(t *testing.T) {
 			assert.Nil(t, err)
 
 			var actual []ObjectA
-			db.Where(testData.filter).Preload(clause.Associations).Find(&actual)
+			err = db.Where(testData.filter).Preload(clause.Associations).Find(&actual).Error
+			assert.Nil(t, err)
+
 			assert.Equal(t, testData.expected, actual)
 		})
 	}

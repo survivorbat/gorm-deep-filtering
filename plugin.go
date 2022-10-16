@@ -47,7 +47,7 @@ func queryCallback(db *gorm.DB) {
 				}
 
 				// Empty the WHERE clause so it doesn't get applied
-				db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[index] = clause.Clause{}
+				exp.Exprs = append(db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[:index], db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[index+1:]...)
 			}
 		}
 	}
