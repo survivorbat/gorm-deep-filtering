@@ -1,5 +1,7 @@
 # 🌌 Gorm Deep Filtering Plugin
 
+[![Go package](https://github.com/survivorbat/gorm-deep-filtering/actions/workflows/test.yaml/badge.svg)](https://github.com/survivorbat/gorm-deep-filtering/actions/workflows/test.yaml)
+
 Ever wanted to filter objects on a deep level using only maps? This plugin allows you to do just that.
 
 ```go
