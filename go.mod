@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/stoewer/go-strcase v1.2.0
 	github.com/stretchr/testify v1.8.0
 	gorm.io/driver/sqlite v1.3.6
 	gorm.io/gorm v1.23.8

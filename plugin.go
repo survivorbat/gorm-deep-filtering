@@ -37,18 +37,20 @@ func queryCallback(db *gorm.DB) {
 			switch value := cond.Value.(type) {
 			case map[string]any:
 				concreteType := ensureNotASlice(reflect.TypeOf(db.Statement.Model))
-
 				inputObject := ensureConcrete(reflect.New(concreteType)).Interface()
-				_, err := AddDeepFilters(db.Model(inputObject), inputObject, map[string]any{cond.Column.(string): value})
+
+				applied, err := AddDeepFilters(db.Session(&gorm.Session{NewDB: true}), inputObject, map[string]any{cond.Column.(string): value})
 
 				if err != nil {
 					_ = db.AddError(err)
 					return
 				}
 
-				// Empty the WHERE clause so it doesn't get applied
-				exp.Exprs = append(db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[:index], db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[index+1:]...)
+				// Replace the map filter with the newly created deep-filter
+				db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[index] = applied.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[0]
 			}
 		}
 	}
+
+	return
 }

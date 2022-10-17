@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 	"reflect"
 	"sync"
 	"testing"
@@ -15,19 +16,16 @@ import (
 
 // Functions
 
-func resetCache() {
-	cacheDatabaseMap = sync.Map{}
-}
-
 func newDatabase(t *testing.T) *gorm.DB {
+	t.Helper()
+
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
 
-	// Make sure SQLite uses foreign keys properly, without this it will ignore
-	// any errors
+	// Make sure SQLite uses foreign keys properly, without this it will ignore any errors
 	db.Exec("PRAGMA foreign_keys = ON;")
 
 	return db
@@ -63,155 +61,22 @@ type ManyB struct {
 
 // Tests
 
-func TestGetSpecificStructTagValue_ReturnsExpectedValue(t *testing.T) {
-	t.Parallel()
-	type TestStruct struct {
-		First  string `test:"hello:world;other:one"`
-		Second int    `other:"key:value;other,somebody" test:"too" third:"yes:no"`
-	}
-
-	tests := map[string]struct {
-		key           string
-		tag           string
-		field         reflect.StructField
-		expectedValue string
-	}{
-		"first": {
-			key:           "hello",
-			tag:           "test",
-			field:         reflect.TypeOf(TestStruct{}).Field(0),
-			expectedValue: "world",
-		},
-		"second": {
-			key:           "key",
-			tag:           "other",
-			field:         reflect.TypeOf(TestStruct{}).Field(1),
-			expectedValue: "value",
-		},
-		"third": {
-			key:           "yes",
-			tag:           "third",
-			field:         reflect.TypeOf(TestStruct{}).Field(1),
-			expectedValue: "no",
-		},
-	}
-
-	for name, testData := range tests {
-		testData := testData
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			// Act
-			result, err := getSpecificStructTagValue(testData.field, testData.tag, testData.key)
-
-			// Assert
-			assert.Nil(t, err)
-
-			if assert.NotEmpty(t, result) {
-				assert.Equal(t, testData.expectedValue, result)
-			}
-		})
-	}
-}
-
-func TestGetSpecificStructTagValue_ReturnsErrorOnNoTag(t *testing.T) {
-	t.Parallel()
-	type TestStruct struct {
-		First  string
-		Second int `test:"too"`
-	}
-
-	tests := map[string]struct {
-		key   string
-		tag   string
-		field reflect.StructField
-	}{
-		"first": {
-			key:   "hello",
-			tag:   "test",
-			field: reflect.TypeOf(TestStruct{}).Field(0),
-		},
-		"second": {
-			key:   "key",
-			tag:   "other",
-			field: reflect.TypeOf(TestStruct{}).Field(1),
-		},
-	}
-
-	for name, testData := range tests {
-		testData := testData
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			// Act
-			result, err := getSpecificStructTagValue(testData.field, testData.tag, testData.key)
-
-			// Assert
-			assert.Empty(t, result)
-
-			if assert.NotNil(t, err) {
-				expectedError := fmt.Sprintf("tag '%v' not found in field '%v'", testData.tag, testData.field.Name)
-				assert.Equal(t, expectedError, err.Error())
-			}
-		})
-	}
-}
-
-func TestGetSpecificStructTagValue_ReturnsErrorOnNoKey(t *testing.T) {
-	t.Parallel()
-	type TestStruct struct {
-		First  string `test:"one:two"`
-		Second int    `test:"three:four"`
-	}
-
-	tests := map[string]struct {
-		key   string
-		tag   string
-		field reflect.StructField
-	}{
-		"first": {
-			key:   "hello",
-			tag:   "test",
-			field: reflect.TypeOf(TestStruct{}).Field(0),
-		},
-		"second": {
-			key:   "otherkey",
-			tag:   "test",
-			field: reflect.TypeOf(TestStruct{}).Field(1),
-		},
-	}
-
-	for name, testData := range tests {
-		testData := testData
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			// Act
-			result, err := getSpecificStructTagValue(testData.field, testData.tag, testData.key)
-
-			// Assert
-			assert.Empty(t, result)
-
-			if assert.NotNil(t, err) {
-				expectedError := fmt.Sprintf("key '%v' in tag '%v' not found", testData.key, testData.tag)
-				assert.Equal(t, expectedError, err.Error())
-			}
-		})
-	}
-}
-
 func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
 	t.Parallel()
 	// Arrange
-	type SimpleStruct struct {
+	type SimpleStruct1 struct {
 		//nolint
 		Name string
 		//nolint
 		Occupation string
 	}
-
-	resetCache()
 	expectedResult := map[string]*nestedType{}
 
+	naming := newDatabase(t).NamingStrategy
+	schemaInfo, _ := schema.Parse(&SimpleStruct1{}, &sync.Map{}, naming)
+
 	// Act
-	result := getDatabaseFieldsOfType(SimpleStruct{})
+	result := getDatabaseFieldsOfType(nil, schemaInfo)
 
 	// Assert
 	assert.Equal(t, expectedResult, result)
@@ -220,30 +85,32 @@ func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeFields(t *testing.T) {
 	t.Parallel()
 	// Arrange
-	type SimpleStruct struct {
+	type SimpleStruct2 struct {
+		ID         int
 		Name       string
 		Occupation string
 	}
 
-	type TypeWithStruct struct {
-		//nolint
-		nestedStruct SimpleStruct `gorm:"foreignKey:nestedStructRef"`
-		//nolint
-		nestedStructRef int
+	type TypeWithStruct1 struct {
+		ID              int
+		NestedStruct    SimpleStruct2 `gorm:"foreignKey:NestedStructRef"`
+		NestedStructRef int
 	}
 
-	resetCache()
+	naming := newDatabase(t).NamingStrategy
+
+	schemaInfo, _ := schema.Parse(TypeWithStruct1{}, &sync.Map{}, naming)
 
 	// Act
-	result := getDatabaseFieldsOfType(TypeWithStruct{})
+	result := getDatabaseFieldsOfType(naming, schemaInfo)
 
 	// Assert
 	assert.Len(t, result, 1)
 
-	// Check if expected 'nestedStruct' exists
+	// Check if expected 'NestedStruct1' exists
 	if assert.NotNil(t, result["nested_struct"]) {
-		// Check if it's a SimpleStruct
-		assert.Equal(t, &SimpleStruct{}, result["nested_struct"].fieldStructInstance)
+		// Check if it's a SimpleStruct1
+		assert.IsType(t, &SimpleStruct2{}, result["nested_struct"].fieldStructInstance)
 		assert.Equal(t, "nested_struct_ref", result["nested_struct"].fieldForeignKey)
 		assert.Equal(t, "oneToMany", result["nested_struct"].relationType)
 	}
@@ -252,32 +119,32 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeFields(t *testing.T) {
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeOfSliceFields(t *testing.T) {
 	t.Parallel()
 	// Arrange
-	type SimpleStruct struct {
+	type SimpleStruct3 struct {
+		ID                int
 		Name              *string
 		Occupation        *string
 		TypeWithStructRef int
 	}
 
-	//nolint
-	type SimpleStructs []*SimpleStruct
-
-	type TypeWithStruct struct {
-		//nolint
-		nestedStruct *SimpleStructs `gorm:"foreignKey:TypeWithStructRef"`
+	type TypeWithStruct2 struct {
+		ID           int
+		NestedStruct []*SimpleStruct3 `gorm:"foreignKey:TypeWithStructRef"`
 	}
 
-	resetCache()
+	naming := newDatabase(t).NamingStrategy
+
+	schemaInfo, _ := schema.Parse(&TypeWithStruct2{}, &sync.Map{}, naming)
 
 	// Act
-	result := getDatabaseFieldsOfType(TypeWithStruct{})
+	result := getDatabaseFieldsOfType(naming, schemaInfo)
 
 	// Assert
 	assert.Len(t, result, 1)
 
-	// Check if expected 'nestedStruct' exists
+	// Check if expected 'NestedStruct1' exists
 	if assert.NotNil(t, result["nested_struct"]) {
-		// Check if it's a SimpleStruct
-		assert.Equal(t, &SimpleStruct{}, result["nested_struct"].fieldStructInstance)
+		// Check if it's a SimpleStruct1
+		assert.IsType(t, &SimpleStruct3{}, result["nested_struct"].fieldStructInstance)
 		assert.Equal(t, "type_with_struct_ref", result["nested_struct"].fieldForeignKey)
 		assert.Equal(t, "manyToOne", result["nested_struct"].relationType)
 	}
@@ -286,30 +153,29 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeOfSliceFields(t *testing.T) {
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeFieldsOnConsecutiveCalls(t *testing.T) {
 	t.Parallel()
 	// Arrange
-	type SimpleStruct struct {
+	type SimpleStruct4 struct {
 		Name       string
 		Occupation string
 	}
 
-	type TypeWithStruct struct {
-		//nolint
-		nestedStruct SimpleStruct `gorm:"foreignKey:nestedStructRef"`
-		//nolint
-		nestedStructRef int
+	type TypeWithStruct3 struct {
+		NestedStruct    SimpleStruct4 `gorm:"foreignKey:NestedStructRef"`
+		NestedStructRef int
 	}
 
-	resetCache()
+	naming := newDatabase(t).NamingStrategy
+	schemaInfo, _ := schema.Parse(&TypeWithStruct3{}, &sync.Map{}, naming)
 
-	_ = getDatabaseFieldsOfType(TypeWithStruct{})
+	_ = getDatabaseFieldsOfType(naming, schemaInfo)
 
 	// Act
-	result := getDatabaseFieldsOfType(TypeWithStruct{})
+	result := getDatabaseFieldsOfType(naming, schemaInfo)
 
 	// Assert
 	assert.Len(t, result, 1)
 
 	if assert.NotNil(t, result["nested_struct"]) {
-		assert.EqualValues(t, &SimpleStruct{}, result["nested_struct"].fieldStructInstance)
+		assert.IsType(t, &SimpleStruct4{}, result["nested_struct"].fieldStructInstance)
 
 		assert.Equal(t, "nested_struct_ref", result["nested_struct"].fieldForeignKey)
 		assert.Equal(t, "oneToMany", result["nested_struct"].relationType)
@@ -504,30 +370,34 @@ func TestGetInstanceAndValueTypeInfoOfField_ReturnsNilOnNonStructUnknownType(t *
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 	t.Parallel()
-	type NestedStruct struct{}
+	type NestedStruct1 struct {
+		ID int
+	}
 
 	type TestStruct struct {
-		A *TestStruct   `gorm:"foreignKey:test"`
-		B *NestedStruct `gorm:"foreignKey:other"`
+		ID int
+
+		TestAID int
+		A       *TestStruct `gorm:"foreignKey:TestAID"`
+
+		TestBID int
+		B       *NestedStruct1 `gorm:"foreignKey:TestBID"`
 	}
 
 	tests := map[string]struct {
-		inputType          reflect.Type
-		field              reflect.StructField
+		field              string
 		expectedForeignKey string
 		expected           any
 	}{
 		"first": {
 			expected:           &TestStruct{},
-			inputType:          reflect.TypeOf(TestStruct{}),
-			field:              reflect.TypeOf(TestStruct{}).Field(0),
-			expectedForeignKey: "test",
+			field:              "A",
+			expectedForeignKey: "test_a_id",
 		},
 		"second": {
-			expected:           &NestedStruct{},
-			inputType:          reflect.TypeOf(TestStruct{}),
-			field:              reflect.TypeOf(TestStruct{}).Field(1),
-			expectedForeignKey: "other",
+			expected:           &NestedStruct1{},
+			field:              "B",
+			expectedForeignKey: "test_b_id",
 		},
 	}
 
@@ -535,8 +405,13 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 		testData := testData
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			// Arrange
+			naming := newDatabase(t).NamingStrategy
+			schemaInfo, _ := schema.Parse(TestStruct{}, &sync.Map{}, naming)
+			field := schemaInfo.FieldsByName[testData.field]
+
 			// Act
-			result, err := getNestedType(testData.field, testData.inputType)
+			result, err := getNestedType(naming, field, reflect.TypeOf(TestStruct{}))
 
 			// Assert
 			assert.Nil(t, err)
@@ -546,7 +421,6 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 				assert.Equal(t, testData.expectedForeignKey, result.fieldForeignKey)
 				assert.Equal(t, testData.expected, result.fieldStructInstance)
 
-				assert.Equal(t, nil, result.destinationManyToManyStructInstance)
 				assert.Equal(t, "", result.destinationManyToManyForeignKey)
 				assert.Equal(t, "", result.manyToManyTable)
 			}
@@ -556,11 +430,17 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 	t.Parallel()
-	type NestedStruct struct{}
+	type NestedStruct2 struct {
+		ID  int
+		BID int
+	}
 
 	type TestStruct struct {
-		A *[]TestStruct   `gorm:"foreignKey:test"`
-		B *[]NestedStruct `gorm:"foreignKey:other"`
+		ID int
+
+		AID int
+		A   []TestStruct    `gorm:"foreignKey:AID"`
+		B   []NestedStruct2 `gorm:"foreignKey:BID"`
 	}
 
 	tests := map[string]struct {
@@ -572,14 +452,14 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 		"first": {
 			expected:           &TestStruct{},
 			inputType:          reflect.TypeOf(TestStruct{}),
-			field:              reflect.TypeOf(TestStruct{}).Field(0),
-			expectedForeignKey: "test",
+			field:              reflect.TypeOf(TestStruct{}).Field(2),
+			expectedForeignKey: "a_id",
 		},
 		"second": {
-			expected:           &NestedStruct{},
+			expected:           &NestedStruct2{},
 			inputType:          reflect.TypeOf(TestStruct{}),
-			field:              reflect.TypeOf(TestStruct{}).Field(1),
-			expectedForeignKey: "other",
+			field:              reflect.TypeOf(TestStruct{}).Field(3),
+			expectedForeignKey: "b_id",
 		},
 	}
 
@@ -587,8 +467,13 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 		testData := testData
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			// Arrange
+			naming := newDatabase(t).NamingStrategy
+			schemaInfo, _ := schema.Parse(TestStruct{}, &sync.Map{}, naming)
+			field := schemaInfo.FieldsByName[testData.field.Name]
+
 			// Act
-			result, err := getNestedType(testData.field, nil)
+			result, err := getNestedType(naming, field, nil)
 
 			// Assert
 			assert.Nil(t, err)
@@ -598,7 +483,6 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 				assert.Equal(t, testData.expectedForeignKey, result.fieldForeignKey)
 				assert.Equal(t, testData.expected, result.fieldStructInstance)
 
-				assert.Equal(t, nil, result.destinationManyToManyStructInstance)
 				assert.Equal(t, "", result.destinationManyToManyForeignKey)
 				assert.Equal(t, "", result.manyToManyTable)
 			}
@@ -609,21 +493,24 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 	t.Parallel()
 	// Arrange
+	naming := newDatabase(t).NamingStrategy
+
+	schemaInfo, _ := schema.Parse(ManyA{}, &sync.Map{}, naming)
+	field := schemaInfo.FieldsByName["ManyBs"]
+
 	inputType := reflect.TypeOf(ManyA{})
-	inputField := inputType.Field(2)
 
 	// This is what ManyA should return
 	expected := &nestedType{
-		fieldStructInstance:                 &ManyB{},
-		fieldForeignKey:                     "many_b_id",
-		relationType:                        "manyToMany",
-		manyToManyTable:                     "a_b",
-		destinationManyToManyForeignKey:     "many_a_id",
-		destinationManyToManyStructInstance: &ManyB{},
+		fieldStructInstance:             &ManyB{},
+		fieldForeignKey:                 "many_b_id",
+		relationType:                    "manyToMany",
+		manyToManyTable:                 "a_b",
+		destinationManyToManyForeignKey: "many_a_id",
 	}
 
 	// Act
-	result, err := getNestedType(inputField, inputType)
+	result, err := getNestedType(naming, field, inputType)
 
 	// Assert
 	assert.Nil(t, err)
@@ -635,21 +522,21 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 
 func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 	t.Parallel()
-	type NestedStruct struct{}
+	type NestedStruct3 struct{}
 
 	type TestStruct struct {
 		A *[]TestStruct `gorm:""`
-		B *[]NestedStruct
+		B *[]NestedStruct3
 	}
 
 	tests := map[string]struct {
-		field reflect.StructField
+		field string
 	}{
 		"first": {
-			field: reflect.TypeOf(TestStruct{}).Field(0),
+			field: "A",
 		},
 		"second": {
-			field: reflect.TypeOf(TestStruct{}).Field(1),
+			field: "B",
 		},
 	}
 
@@ -657,14 +544,19 @@ func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 		testData := testData
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			// Arrange
+			naming := newDatabase(t).NamingStrategy
+			schemaInfo, _ := schema.Parse(TestStruct{}, &sync.Map{}, naming)
+			field := schemaInfo.FieldsByName[testData.field]
+
 			// Act
-			result, err := getNestedType(testData.field, nil)
+			result, err := getNestedType(naming, field, nil)
 
 			// Assert
 			assert.Nil(t, result)
 
 			if assert.NotNil(t, err) {
-				expected := fmt.Sprintf("no 'foreignKey:...' or 'many2many:...' found in field %v", testData.field.Name)
+				expected := fmt.Sprintf("no 'foreignKey:...' or 'many2many:...' found in field %v", testData.field)
 				assert.Equal(t, expected, err.Error())
 			}
 		})
@@ -673,18 +565,18 @@ func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 
 func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 	t.Parallel()
-	type SimpleStruct struct {
+	type SimpleStruct5 struct {
 		Name       string
 		Occupation string
 	}
 
 	tests := map[string]struct {
-		records   []*SimpleStruct
+		records   []*SimpleStruct5
 		filterMap map[string]any
 		fieldName string
 	}{
 		"first": {
-			records: []*SimpleStruct{
+			records: []*SimpleStruct5{
 				{
 					Occupation: "Dev",
 					Name:       "John",
@@ -700,7 +592,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 			fieldName: "probation",
 		},
 		"second": {
-			records: []*SimpleStruct{
+			records: []*SimpleStruct5{
 				{
 					Occupation: "Dev",
 					Name:       "John",
@@ -723,14 +615,12 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 			t.Parallel()
 			// Arrange
 			database := newDatabase(t)
-			_ = database.AutoMigrate(&SimpleStruct{})
+			_ = database.AutoMigrate(&SimpleStruct5{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
-			resetCache()
-
 			// Act
-			query, err := AddDeepFilters(database, SimpleStruct{}, testData.filterMap)
+			query, err := AddDeepFilters(database, SimpleStruct5{}, testData.filterMap)
 
 			// Assert
 			assert.Nil(t, query)
@@ -745,18 +635,18 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 
 func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 	t.Parallel()
-	type SimpleStruct struct {
+	type SimpleStruct6 struct {
 		Name       string
 		Occupation string
 	}
 
 	tests := map[string]struct {
-		records   []*SimpleStruct
-		expected  []*SimpleStruct
+		records   []*SimpleStruct6
+		expected  []*SimpleStruct6
 		filterMap map[string]any
 	}{
 		"first": {
-			records: []*SimpleStruct{
+			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
 					Name:       "John",
@@ -766,7 +656,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 					Name:       "Jennifer",
 				},
 			},
-			expected: []*SimpleStruct{
+			expected: []*SimpleStruct6{
 				{
 					Occupation: "Ops",
 					Name:       "Jennifer",
@@ -777,7 +667,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 			},
 		},
 		"second": {
-			records: []*SimpleStruct{
+			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
 					Name:       "John",
@@ -791,7 +681,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 					Name:       "Roy",
 				},
 			},
-			expected: []*SimpleStruct{
+			expected: []*SimpleStruct6{
 				{
 					Occupation: "Ops",
 					Name:       "Jennifer",
@@ -806,7 +696,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 			},
 		},
 		"third": {
-			records: []*SimpleStruct{
+			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
 					Name:       "John",
@@ -816,7 +706,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 					Name:       "Jennifer",
 				},
 			},
-			expected: []*SimpleStruct{
+			expected: []*SimpleStruct6{
 				{
 					Occupation: "Ops",
 					Name:       "Jennifer",
@@ -828,7 +718,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 			},
 		},
 		"fourth": {
-			records: []*SimpleStruct{
+			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
 					Name:       "John",
@@ -838,7 +728,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 					Name:       "Jennifer",
 				},
 			},
-			expected: []*SimpleStruct{
+			expected: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
 					Name:       "John",
@@ -860,20 +750,18 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 			t.Parallel()
 			// Arrange
 			database := newDatabase(t)
-			_ = database.AutoMigrate(&SimpleStruct{})
+			_ = database.AutoMigrate(&SimpleStruct6{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
-			resetCache()
-
 			// Act
-			query, err := AddDeepFilters(database, SimpleStruct{}, testData.filterMap)
+			query, err := AddDeepFilters(database, SimpleStruct6{}, testData.filterMap)
 
 			// Assert
 			assert.Nil(t, err)
 
 			if assert.NotNil(t, query) {
-				var result []*SimpleStruct
+				var result []*SimpleStruct6
 				query.Preload(clause.Associations).Find(&result)
 
 				assert.EqualValues(t, result, testData.expected)
@@ -884,31 +772,31 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 	t.Parallel()
-	type NestedStruct struct {
+	type NestedStruct4 struct {
 		ID         uuid.UUID
 		Name       string
 		Occupation string
 	}
 
-	type ComplexStruct struct {
+	type ComplexStruct1 struct {
 		ID        uuid.UUID
 		Value     int
-		Nested    *NestedStruct `gorm:"foreignKey:NestedRef"`
+		Nested    *NestedStruct4 `gorm:"foreignKey:NestedRef"`
 		NestedRef uuid.UUID
 	}
 
 	tests := map[string]struct {
-		records   []*ComplexStruct
-		expected  []ComplexStruct
+		records   []*ComplexStruct1
+		expected  []ComplexStruct1
 		filterMap map[string]any
 	}{
 		"looking for 1 katherina": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct1{
 				{
 					ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 					Value:     1,
 					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
 						Name:       "Johan",
 						Occupation: "Dev",
@@ -918,7 +806,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 					Value:     11,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Katherina",
@@ -926,12 +814,12 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct1{
 				{
 					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 					Value:     11,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Katherina",
 						Occupation: "Dev",
@@ -945,12 +833,12 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 			},
 		},
 		"looking for 1 katherina and value 11": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct1{
 				{
 					ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 					Value:     1,
 					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
 						Name:       "Johan",
 						Occupation: "Dev",
@@ -960,7 +848,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 					Value:     11,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Katherina",
@@ -968,12 +856,12 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct1{
 				{
 					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 					Value:     11,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Katherina",
 						Occupation: "Dev",
@@ -988,12 +876,12 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 			},
 		},
 		"looking for 2 vanessas": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct1{
 				{
 					ID:        uuid.MustParse("c98dc9f2-bfa5-4ab5-9cbb-76800e09e512"),
 					Value:     4,
 					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
 						Name:       "Vanessa",
 						Occupation: "Ops",
@@ -1003,7 +891,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					ID:        uuid.MustParse("2ad6a4fe-e0a4-4791-8f10-df6317cdb8b5"),
 					Value:     193,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Vanessa",
 						Occupation: "Dev",
@@ -1013,19 +901,19 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					ID:        uuid.MustParse("5cc022ae-43a1-44d8-8ab5-31350e68d0b1"),
 					Value:     1593,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c5"), // C
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c5"), // C
 						Name:       "Derek",
 						Occupation: "Dev",
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct1{
 				{
 					ID:        uuid.MustParse("c98dc9f2-bfa5-4ab5-9cbb-76800e09e512"),
 					Value:     4,
 					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
 						Name:       "Vanessa",
 						Occupation: "Ops",
@@ -1035,7 +923,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					ID:        uuid.MustParse("2ad6a4fe-e0a4-4791-8f10-df6317cdb8b5"),
 					Value:     193,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Vanessa",
 						Occupation: "Dev",
@@ -1049,12 +937,12 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 			},
 		},
 		"looking for both coat and joke": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct1{
 				{
 					ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 					Value:     1,
 					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
 						Name:       "Coat",
 						Occupation: "Product Owner",
@@ -1064,19 +952,19 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 					Value:     2,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Joke",
 						Occupation: "Ops",
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct1{
 				{
 					ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 					Value:     1,
 					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
 						Name:       "Coat",
 						Occupation: "Product Owner",
@@ -1086,7 +974,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 					Value:     2,
 					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
-					Nested: &NestedStruct{
+					Nested: &NestedStruct4{
 						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
 						Name:       "Joke",
 						Occupation: "Ops",
@@ -1107,31 +995,25 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 			t.Parallel()
 			// Arrange
 			database := newDatabase(t)
-			_ = database.AutoMigrate(&ComplexStruct{}, &NestedStruct{})
-
-			// Make sure SQLite uses foreign keys properly, without this it will ignore
-			// any errors
-			database.Exec("PRAGMA foreign_keys = ON;")
+			_ = database.AutoMigrate(&ComplexStruct1{}, &NestedStruct4{})
 
 			// Crate records
 			database.CreateInBatches(testData.records, len(testData.records))
 
-			resetCache()
-
 			// Act
-			query, err := AddDeepFilters(database, ComplexStruct{}, testData.filterMap)
+			query, err := AddDeepFilters(database, ComplexStruct1{}, testData.filterMap)
 
 			// Assert
 			assert.Nil(t, err)
 
 			if assert.NotNil(t, query) {
-				var result []ComplexStruct
+				var result []ComplexStruct1
 				res := query.Preload(clause.Associations).Find(&result)
 
 				// Handle error
 				assert.Nil(t, res.Error)
 
-				assert.EqualValues(t, testData.expected, result)
+				assert.Equal(t, testData.expected, result)
 			}
 		})
 	}
@@ -1146,25 +1028,23 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 		ComplexStructRef uuid.UUID
 	}
 
-	type Tags []*Tag
-
-	type ComplexStruct struct {
+	type ComplexStruct2 struct {
 		ID   uuid.UUID
 		Name string
-		Tags *Tags `gorm:"foreignKey:ComplexStructRef"`
+		Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
 	}
 
 	tests := map[string]struct {
-		records   []*ComplexStruct
-		expected  []ComplexStruct
+		records   []*ComplexStruct2
+		expected  []ComplexStruct2
 		filterMap map[string]any
 	}{
 		"looking for python": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct2{
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1176,7 +1056,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
 					Name: "Go",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1186,11 +1066,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct2{
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1208,11 +1088,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 			},
 		},
 		"javascript-like": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct2{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1224,7 +1104,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1236,7 +1116,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
 					Name: "Ruby",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1246,11 +1126,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct2{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1262,7 +1142,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1280,11 +1160,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 			},
 		},
 		"no results :(": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct2{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1296,7 +1176,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1306,7 +1186,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 					},
 				},
 			},
-			expected: []ComplexStruct{},
+			expected: []ComplexStruct2{},
 			filterMap: map[string]any{
 				"tags": map[string]any{
 					"key":   "other",
@@ -1322,24 +1202,18 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 			t.Parallel()
 			// Arrange
 			database := newDatabase(t)
-			_ = database.AutoMigrate(&ComplexStruct{}, &Tag{})
-
-			// Make sure SQLite uses foreign keys properly, without this it will ignore
-			// any errors
-			database.Exec("PRAGMA foreign_keys = ON;")
+			_ = database.AutoMigrate(&ComplexStruct2{}, &Tag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
-			resetCache()
-
 			// Act
-			query, err := AddDeepFilters(database, ComplexStruct{}, testData.filterMap)
+			query, err := AddDeepFilters(database, ComplexStruct2{}, testData.filterMap)
 
 			// Assert
 			assert.Nil(t, err)
 
 			if assert.NotNil(t, query) {
-				var result []ComplexStruct
+				var result []ComplexStruct2
 				res := query.Preload(clause.Associations).Find(&result)
 
 				// Handle error
@@ -1360,25 +1234,23 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 		ComplexStructRef uuid.UUID
 	}
 
-	type Tags []*Tag
-
-	type ComplexStruct struct {
+	type ComplexStruct3 struct {
 		ID   uuid.UUID
 		Name string
-		Tags *Tags `gorm:"foreignKey:ComplexStructRef"`
+		Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
 	}
 
 	tests := map[string]struct {
-		records   []*ComplexStruct
-		expected  []ComplexStruct
+		records   []*ComplexStruct3
+		expected  []ComplexStruct3
 		filterMap []map[string]any
 	}{
 		"looking for python": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct3{
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1390,7 +1262,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
 					Name: "Go",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1400,11 +1272,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct3{
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1427,11 +1299,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 			},
 		},
 		"javascript-like and not python-like": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct3{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1449,7 +1321,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1461,7 +1333,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
 					Name: "Ruby",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1477,11 +1349,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 					},
 				},
 			},
-			expected: []ComplexStruct{
+			expected: []ComplexStruct3{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1513,11 +1385,11 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 			},
 		},
 		"no results :(": {
-			records: []*ComplexStruct{
+			records: []*ComplexStruct3{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1529,7 +1401,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: &Tags{
+					Tags: []*Tag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1539,7 +1411,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 					},
 				},
 			},
-			expected: []ComplexStruct{},
+			expected: []ComplexStruct3{},
 			filterMap: []map[string]any{
 				{
 					"tags": map[string]any{
@@ -1563,24 +1435,18 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 			t.Parallel()
 			// Arrange
 			database := newDatabase(t)
-			_ = database.AutoMigrate(&ComplexStruct{}, &Tag{})
-
-			// Make sure SQLite uses foreign keys properly, without this it will ignore
-			// any errors
-			database.Exec("PRAGMA foreign_keys = ON;")
+			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
-			resetCache()
-
 			// Act
-			query, err := AddDeepFilters(database, ComplexStruct{}, testData.filterMap...)
+			query, err := AddDeepFilters(database, ComplexStruct3{}, testData.filterMap...)
 
 			// Assert
 			assert.Nil(t, err)
 
 			if assert.NotNil(t, query) {
-				var result []ComplexStruct
+				var result []ComplexStruct3
 				res := query.Preload(clause.Associations).Find(&result)
 
 				// Handle error
@@ -1810,13 +1676,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnSingleFilter(t *testing.T
 			database := newDatabase(t)
 			_ = database.AutoMigrate(&ManyA{}, &ManyB{})
 
-			// Make sure SQLite uses foreign keys properly, without this it will ignore
-			// any errors
-			database.Exec("PRAGMA foreign_keys = ON;")
-
 			database.CreateInBatches(testData.records, len(testData.records))
-
-			resetCache()
 
 			// Act
 			query, err := AddDeepFilters(database, ManyA{}, testData.filterMap)
@@ -2122,16 +1982,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnMultiFilter(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := newDatabase(t).Debug()
 			_ = database.AutoMigrate(&ManyA{}, &ManyB{})
 
-			// Make sure SQLite uses foreign keys properly, without this it will ignore
-			// any errors
-			database.Exec("PRAGMA foreign_keys = ON;")
-
 			database.CreateInBatches(testData.records, len(testData.records))
-
-			resetCache()
 
 			// Act
 			query, err := AddDeepFilters(database, ManyA{}, testData.filterMap...)
@@ -2292,13 +2146,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 			database := newDatabase(t)
 			_ = database.AutoMigrate(&Resource{}, &Tag{})
 
-			// Make sure SQLite uses foreign keys properly, without this it will ignore
-			// any errors
-			database.Exec("PRAGMA foreign_keys = ON;")
-
 			database.CreateInBatches(testData.records, len(testData.records))
-
-			resetCache()
 
 			// Act
 			query, err := AddDeepFilters(database, Resource{}, testData.filterMap)
@@ -2500,13 +2348,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			database := newDatabase(t)
 			_ = database.AutoMigrate(&Resource{}, &Tag{})
 
-			// Make sure SQLite uses foreign keys properly, without this it will ignore
-			// any errors
-			database.Exec("PRAGMA foreign_keys = ON;")
-
 			database.CreateInBatches(testData.records, len(testData.records))
-
-			resetCache()
 
 			// Act
 			query, err := AddDeepFilters(database, Resource{}, testData.filterMap...)

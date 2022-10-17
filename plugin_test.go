@@ -125,8 +125,9 @@ func TestDeepGorm_Initialize_TriggersFilteringCorrectly(t *testing.T) {
 					ID: uuid.MustParse("3415d786-bc03-4543-aa3c-5ec9e55aa460"),
 					ObjectBs: []ObjectB{
 						{
-							ID:   uuid.MustParse("83aaf47d-a167-4a49-8b7c-3516ced56e8a"),
-							Name: "abc",
+							ID:        uuid.MustParse("83aaf47d-a167-4a49-8b7c-3516ced56e8a"),
+							Name:      "abc",
+							ObjectAID: uuid.MustParse("3415d786-bc03-4543-aa3c-5ec9e55aa460"),
 						},
 					},
 				},
@@ -134,8 +135,62 @@ func TestDeepGorm_Initialize_TriggersFilteringCorrectly(t *testing.T) {
 					ID: uuid.MustParse("383e9a9b-ef95-421d-a89e-60f0344ee29d"),
 					ObjectBs: []ObjectB{
 						{
+							ID:        uuid.MustParse("3b35e207-c544-424e-b029-be31d5fe8bad"),
+							Name:      "abc",
+							ObjectAID: uuid.MustParse("383e9a9b-ef95-421d-a89e-60f0344ee29d"),
+						},
+					},
+				},
+			},
+		},
+		"multi filter": {
+			filter: map[string]any{
+				"name": "ghi",
+				"object_bs": map[string]any{
+					"name": "def",
+				},
+			},
+			existing: []ObjectA{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481688"),
+					Name: "ghi",
+					ObjectBs: []ObjectB{
+						{
+							ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481688"),
+							Name: "def",
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("3415d786-bc03-4543-aa3c-5ec9e55aa460"),
+					Name: "nope",
+					ObjectBs: []ObjectB{
+						{
+							ID:   uuid.MustParse("83aaf47d-a167-4a49-8b7c-3516ced56e8a"),
+							Name: "abc",
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("383e9a9b-ef95-421d-a89e-60f0344ee29d"),
+					Name: "Maybe",
+					ObjectBs: []ObjectB{
+						{
 							ID:   uuid.MustParse("3b35e207-c544-424e-b029-be31d5fe8bad"),
 							Name: "abc",
+						},
+					},
+				},
+			},
+			expected: []ObjectA{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481688"),
+					Name: "ghi",
+					ObjectBs: []ObjectB{
+						{
+							ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481688"),
+							Name:      "def",
+							ObjectAID: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481688"),
 						},
 					},
 				},
