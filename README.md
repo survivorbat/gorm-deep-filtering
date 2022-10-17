@@ -27,7 +27,20 @@ SELECT * FROM employees WHERE related_object_id IN (SELECT id FROM occupations W
 
 ## 📋 Usage
 
-Check out [the examples](./examples_test.go).
+```go
+package main
+
+import (
+    "github.com/survivorbat/gorm-deep-filtering"
+)
+
+func main() {
+	db, _ := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+	
+	db.Use(deepgorm.New())
+}
+
+```
 
 ## 🔭 Plans
 
