@@ -2,6 +2,7 @@ package deepgorm
 
 import (
 	"fmt"
+	"github.com/survivorbat/go-tsyncmap"
 	"gorm.io/gorm/schema"
 	"reflect"
 	"sync"
@@ -14,7 +15,7 @@ var (
 	// cache results for quick lookups. Just remember to reset it in unit tests ;-)
 
 	// cacheDatabaseMap map[string]map[string]*nestedType{}
-	cacheDatabaseMap = sync.Map{}
+	cacheDatabaseMap = tsyncmap.Map[string, map[string]*nestedType]{}
 
 	// schemaCache is for gorm's schema.Parse
 	schemaCache = sync.Map{}
@@ -249,7 +250,7 @@ func getDatabaseFieldsOfType(naming schema.Namer, schemaInfo *schema.Schema) map
 	reflectTypeName := reflectType.Name()
 
 	if dbFields, ok := cacheDatabaseMap.Load(reflectTypeName); ok {
-		return dbFields.(map[string]*nestedType)
+		return dbFields
 	}
 
 	var resultNestedType = map[string]*nestedType{}
