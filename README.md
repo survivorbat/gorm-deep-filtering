@@ -1,5 +1,9 @@
 # 🌌 Gorm Deep Filtering Plugin
 
+[![Go package](https://github.com/survivorbat/deepgorm/actions/workflows/test.yaml/badge.svg)](https://github.com/survivorbat/deepgorm/actions/workflows/test.yaml)
+![GitHub](https://img.shields.io/github/license/survivorbat/deepgorm)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/survivorbat/deepgorm)
+
 Ever wanted to filter objects on a deep level using only maps? This plugin allows you to do just that.
 
 ```go
