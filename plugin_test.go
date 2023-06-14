@@ -2,6 +2,7 @@ package deepgorm
 
 import (
 	"github.com/google/uuid"
+	"github.com/ing-bank/gormtestutil"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm/clause"
 	"testing"
@@ -22,7 +23,7 @@ func TestDeepGorm_Name_ReturnsExpectedName(t *testing.T) {
 func TestDeepGorm_Initialize_RegistersCallback(t *testing.T) {
 	t.Parallel()
 	// Arrange
-	db := newDatabase(t)
+	db := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 	plugin := New()
 
 	// Act
@@ -203,7 +204,7 @@ func TestDeepGorm_Initialize_TriggersFilteringCorrectly(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			db := newDatabase(t).Debug()
+			db := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = db.AutoMigrate(&ObjectA{}, &ObjectB{})
 			plugin := New()
 

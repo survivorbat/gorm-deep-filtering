@@ -2,8 +2,7 @@ package deepgorm
 
 import (
 	"fmt"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"github.com/ing-bank/gormtestutil"
 	"gorm.io/gorm/schema"
 	"reflect"
 	"sync"
@@ -13,23 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm/clause"
 )
-
-// Functions
-
-func newDatabase(t *testing.T) *gorm.DB {
-	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	// Make sure SQLite uses foreign keys properly, without this it will ignore any errors
-	db.Exec("PRAGMA foreign_keys = ON;")
-
-	return db
-}
 
 // Mocks
 
@@ -72,7 +54,7 @@ func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
 	}
 	expectedResult := map[string]*nestedType{}
 
-	naming := newDatabase(t).NamingStrategy
+	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 	schemaInfo, _ := schema.Parse(&SimpleStruct1{}, &sync.Map{}, naming)
 
 	// Act
@@ -97,7 +79,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeFields(t *testing.T) {
 		NestedStructRef int
 	}
 
-	naming := newDatabase(t).NamingStrategy
+	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 
 	schemaInfo, _ := schema.Parse(TypeWithStruct1{}, &sync.Map{}, naming)
 
@@ -131,7 +113,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeOfSliceFields(t *testing.T) {
 		NestedStruct []*SimpleStruct3 `gorm:"foreignKey:TypeWithStructRef"`
 	}
 
-	naming := newDatabase(t).NamingStrategy
+	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 
 	schemaInfo, _ := schema.Parse(&TypeWithStruct2{}, &sync.Map{}, naming)
 
@@ -163,7 +145,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeFieldsOnConsecutiveCalls(t *te
 		NestedStructRef int
 	}
 
-	naming := newDatabase(t).NamingStrategy
+	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 	schemaInfo, _ := schema.Parse(&TypeWithStruct3{}, &sync.Map{}, naming)
 
 	_ = getDatabaseFieldsOfType(naming, schemaInfo)
@@ -406,7 +388,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			naming := newDatabase(t).NamingStrategy
+			naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 			schemaInfo, _ := schema.Parse(TestStruct{}, &sync.Map{}, naming)
 			field := schemaInfo.FieldsByName[testData.field]
 
@@ -468,7 +450,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			naming := newDatabase(t).NamingStrategy
+			naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 			schemaInfo, _ := schema.Parse(TestStruct{}, &sync.Map{}, naming)
 			field := schemaInfo.FieldsByName[testData.field.Name]
 
@@ -493,7 +475,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 	t.Parallel()
 	// Arrange
-	naming := newDatabase(t).NamingStrategy
+	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 
 	schemaInfo, _ := schema.Parse(ManyA{}, &sync.Map{}, naming)
 	field := schemaInfo.FieldsByName["ManyBs"]
@@ -545,7 +527,7 @@ func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			naming := newDatabase(t).NamingStrategy
+			naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 			schemaInfo, _ := schema.Parse(TestStruct{}, &sync.Map{}, naming)
 			field := schemaInfo.FieldsByName[testData.field]
 
@@ -614,7 +596,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&SimpleStruct5{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -749,7 +731,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&SimpleStruct6{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -994,7 +976,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).Debug()
 			_ = database.AutoMigrate(&ComplexStruct1{}, &NestedStruct4{})
 
 			// Crate records
@@ -1201,7 +1183,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ComplexStruct2{}, &Tag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -1434,7 +1416,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -1673,7 +1655,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnSingleFilter(t *testing.T
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ManyA{}, &ManyB{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -1982,7 +1964,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnMultiFilter(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t).Debug()
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ManyA{}, &ManyB{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -2143,7 +2125,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&Resource{}, &Tag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -2345,7 +2327,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := newDatabase(t)
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&Resource{}, &Tag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
