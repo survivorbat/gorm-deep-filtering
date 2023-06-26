@@ -10,6 +10,7 @@ func ExampleNew() {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 
 	_ = db.Use(New())
+	_ = db.Use(New(DeepLike()))
 }
 
 // Get all ObjectAs that are connected to ObhectB with Id 50

@@ -625,9 +625,10 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 	tests := map[string]struct {
 		records   []*SimpleStruct6
 		expected  []*SimpleStruct6
+		deepLike  bool
 		filterMap map[string]any
 	}{
-		"first": {
+		"1 from 2": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -648,7 +649,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"occupation": "Ops",
 			},
 		},
-		"second": {
+		"2 from 3": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -677,7 +678,37 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"occupation": "Ops",
 			},
 		},
-		"third": {
+		"2 from 3 with LIKE": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Roy",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filterMap: map[string]any{
+				"name": "J*",
+			},
+			deepLike: true,
+		},
+		"1 from 2 with 2 filters": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -699,7 +730,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"name":       "Jennifer",
 			},
 		},
-		"fourth": {
+		"2 from 2 with 2 filters": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -724,6 +755,32 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"occupation": []string{"Ops", "Dev"},
 			},
 		},
+		"2 from 2 with 2 filters and LIKE": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Developer",
+					Name:       "John",
+				},
+				{
+					Occupation: "Opsie",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Developer",
+					Name:       "John",
+				},
+				{
+					Occupation: "Opsie",
+					Name:       "Jennifer",
+				},
+			},
+			filterMap: map[string]any{
+				"occupation": []string{"*sie", "*loper"},
+			},
+			deepLike: true,
+		},
 	}
 
 	for name, testData := range tests {
@@ -731,13 +788,13 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).Debug()
 			_ = database.AutoMigrate(&SimpleStruct6{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
-			// Act
-			query, err := AddDeepFilters(database, SimpleStruct6{}, testData.filterMap)
+			// Act (this is cheating, but AddDeepFilters is simply a proxy anyway
+			query, err := addDeepFilters(database, SimpleStruct6{}, testData.deepLike, testData.filterMap)
 
 			// Assert
 			assert.Nil(t, err)

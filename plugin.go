@@ -9,12 +9,31 @@ import (
 // Compile-time interface check
 var _ gorm.Plugin = new(deepGorm)
 
-// New creates a new instance of the plugin that can be registered in gorm.
-func New() gorm.Plugin {
-	return &deepGorm{}
+// New creates a new instance of the plugin that can be registered in gorm. Options allow you to
+// enable specific features.
+func New(opts ...Option) *deepGorm {
+	plugin := new(deepGorm)
+
+	for _, opt := range opts {
+		opt(plugin)
+	}
+
+	return plugin
+}
+
+// Option is used to enable features in the New function
+type Option func(*deepGorm)
+
+// DeepLike enables the ability to add `deepgorm:"like"` to the fields in your struct that you want to automatically
+// use LIKE %value% for instead of the normal WHERE check.
+func DeepLike() func(*deepGorm) {
+	return func(cfg *deepGorm) {
+		cfg.deepLike = true
+	}
 }
 
 type deepGorm struct {
+	deepLike bool
 }
 
 func (d *deepGorm) Name() string {

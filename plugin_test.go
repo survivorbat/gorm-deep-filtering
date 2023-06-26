@@ -8,6 +8,14 @@ import (
 	"testing"
 )
 
+func TestNew_DeepLikeEnablesFeature(t *testing.T) {
+	t.Parallel()
+	// Act
+	plugin := New(DeepLike())
+
+	// Assert
+	assert.True(t, plugin.deepLike)
+}
 func TestDeepGorm_Name_ReturnsExpectedName(t *testing.T) {
 	t.Parallel()
 	// Arrange
