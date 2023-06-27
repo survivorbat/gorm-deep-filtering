@@ -107,7 +107,7 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 			case string:
 				// Only wildcards if it's on and there are stars in the query
 				if !deepLike || !strings.Contains(filterType, "*") {
-					simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
+					simpleFilter[fieldName] = givenFilter
 					continue
 				}
 
@@ -117,7 +117,7 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 			case []string:
 				// Only wildcards if it's on and there are stars in the query
 				if !deepLike {
-					simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
+					simpleFilter[fieldName] = givenFilter
 					continue
 				}
 
