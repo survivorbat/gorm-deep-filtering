@@ -781,6 +781,32 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 			},
 			deepLike: true,
 		},
+		"2 from 2 with 2 filters, only one LIKE": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Developer",
+					Name:       "John",
+				},
+				{
+					Occupation: "Opsie",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Developer",
+					Name:       "John",
+				},
+				{
+					Occupation: "Opsie",
+					Name:       "Jennifer",
+				},
+			},
+			filterMap: map[string]any{
+				"occupation": []string{"Opsie", "*loper"},
+			},
+			deepLike: true,
+		},
 	}
 
 	for name, testData := range tests {
@@ -788,7 +814,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).Debug()
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&SimpleStruct6{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -1033,7 +1059,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// Arrange
-			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).Debug()
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ComplexStruct1{}, &NestedStruct4{})
 
 			// Crate records

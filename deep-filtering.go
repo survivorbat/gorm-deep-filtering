@@ -72,7 +72,7 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 	return addDeepFilters(db, objectType, false, filters...)
 }
 
-// addDeepFilters allows us to add deepLike without breaking AddDeepFilters
+// addDeepFilters allows us to add wildcards without breaking AddDeepFilters
 func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[string]any) (*gorm.DB, error) {
 	schemaInfo, err := schema.Parse(objectType, &schemaCache, db.NamingStrategy)
 	if err != nil {
@@ -105,7 +105,7 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 				db = query
 
 			case string:
-				// Only deepLike if it's on and there are stars in the query
+				// Only wildcards if it's on and there are stars in the query
 				if !deepLike || !strings.Contains(filterType, "*") {
 					simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
 					continue
@@ -115,37 +115,30 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 				db = db.Where(whereFilter, strings.ReplaceAll(filterType, "*", "%"))
 
 			case []string:
-				// Only deepLike if it's on and there are stars in the query
+				// Only wildcards if it's on and there are stars in the query
 				if !deepLike {
 					simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
 					continue
 				}
 
-				var strictFilters []string
-				var likeFilters []*gorm.DB
+				var shouldOr bool
 
 				for _, searchString := range filterType {
-					if !strings.Contains(searchString, "*") {
-						strictFilters = append(strictFilters, searchString)
+					whereFilter := fmt.Sprintf("%s.%s = ?", schemaInfo.Table, fieldName)
+
+					if strings.Contains(searchString, "*") {
+						whereFilter = fmt.Sprintf("%s.%s LIKE ?", schemaInfo.Table, fieldName)
+					}
+
+					searchString = strings.ReplaceAll(searchString, "*", "%")
+
+					if shouldOr {
+						db = db.Or(whereFilter, searchString)
 						continue
 					}
 
-					whereFilter := fmt.Sprintf("%s.%s LIKE ?", schemaInfo.Table, fieldName)
-
-					if len(likeFilters) > 0 {
-						likeFilters = append(likeFilters, db.Or(whereFilter, strings.ReplaceAll(searchString, "*", "%")))
-						continue
-					}
-
-					likeFilters = append(likeFilters, db.Where(whereFilter, strings.ReplaceAll(searchString, "*", "%")))
-				}
-
-				if len(likeFilters) > 0 {
-					db = db.Where(likeFilters)
-				}
-
-				if len(strictFilters) > 0 {
-					simpleFilter[schemaInfo.Table+"."+fieldName] = strictFilters
+					db = db.Where(whereFilter, searchString)
+					shouldOr = true
 				}
 
 			// Simple filters (string, int, bool etc.)
