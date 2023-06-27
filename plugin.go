@@ -73,7 +73,12 @@ func applyFilter(db *gorm.DB, wildcards bool, index int, cond clause.Eq, value a
 	concreteType := ensureNotASlice(reflect.TypeOf(db.Statement.Model))
 	inputObject := ensureConcrete(reflect.New(concreteType)).Interface()
 
-	applied, err := addDeepFilters(db.Session(&gorm.Session{NewDB: true}), inputObject, wildcards, map[string]any{cond.Column.(string): value})
+	columnString, ok := cond.Column.(string)
+	if !ok {
+		return
+	}
+
+	applied, err := addDeepFilters(db.Session(&gorm.Session{NewDB: true}), inputObject, wildcards, map[string]any{columnString: value})
 
 	if err != nil {
 		_ = db.AddError(err)
