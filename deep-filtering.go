@@ -5,6 +5,7 @@ import (
 	"github.com/survivorbat/go-tsyncmap"
 	"gorm.io/gorm/schema"
 	"reflect"
+	"strings"
 	"sync"
 
 	"gorm.io/gorm"
@@ -68,6 +69,11 @@ var (
 //     For all the special (nested) structs, add a subquery that uses WHERE on the subquery.
 //  4. Add the simple filters to the query and return it.
 func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*gorm.DB, error) {
+	return addDeepFilters(db, objectType, false, filters...)
+}
+
+// addDeepFilters allows us to add wildcards without breaking AddDeepFilters
+func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[string]any) (*gorm.DB, error) {
 	schemaInfo, err := schema.Parse(objectType, &schemaCache, db.NamingStrategy)
 	if err != nil {
 		return nil, err
@@ -81,7 +87,7 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 	for _, filterObject := range filters {
 		// Go through all the keys of the filters
 		for fieldName, givenFilter := range filterObject {
-			switch givenFilter.(type) {
+			switch filterType := givenFilter.(type) {
 			// WithFilters for relational objects
 			case map[string]any:
 				fieldInfo, ok := relationalTypesInfo[fieldName]
@@ -97,6 +103,43 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 				}
 
 				db = query
+
+			case string:
+				// Only wildcards if it's on and there are stars in the query
+				if !deepLike || !strings.Contains(filterType, "*") {
+					simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
+					continue
+				}
+
+				whereFilter := fmt.Sprintf("%s.%s LIKE ?", schemaInfo.Table, fieldName)
+				db = db.Where(whereFilter, strings.ReplaceAll(filterType, "*", "%"))
+
+			case []string:
+				// Only wildcards if it's on and there are stars in the query
+				if !deepLike {
+					simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
+					continue
+				}
+
+				var shouldOr bool
+
+				for _, searchString := range filterType {
+					whereFilter := fmt.Sprintf("%s.%s = ?", schemaInfo.Table, fieldName)
+
+					if strings.Contains(searchString, "*") {
+						whereFilter = fmt.Sprintf("%s.%s LIKE ?", schemaInfo.Table, fieldName)
+					}
+
+					searchString = strings.ReplaceAll(searchString, "*", "%")
+
+					if shouldOr {
+						db = db.Or(whereFilter, searchString)
+						continue
+					}
+
+					db = db.Where(whereFilter, searchString)
+					shouldOr = true
+				}
 
 			// Simple filters (string, int, bool etc.)
 			default:

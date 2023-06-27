@@ -6,6 +6,9 @@
 
 Ever wanted to filter objects on a deep level using only maps? This plugin allows you to do just that.
 
+There's also an experimental feature that turns wildcard queries (*) into LIKE queries, but this may be changed in
+the future.
+
 ```go
 package main
 
@@ -41,7 +44,11 @@ import (
 func main() {
 	db, _ := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
 	
+	// Adds deep filtering
 	db.Use(deepgorm.New())
+	
+	// Turns strings with wildcards (*) into LIKE queries (EXPERIMENTAL FEATURE)
+	db.Use(deepgorm.New(deepgorm.Wildcards()))
 }
 
 ```
