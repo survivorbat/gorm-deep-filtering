@@ -111,7 +111,7 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 					continue
 				}
 
-				whereFilter := fmt.Sprintf("%s.%s LIKE ?", schemaInfo.Table, fieldName)
+				whereFilter := fmt.Sprintf("%s LIKE ?", fieldName)
 				db = db.Where(whereFilter, strings.ReplaceAll(filterType, "*", "%"))
 
 			case []string:
