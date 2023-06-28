@@ -57,23 +57,32 @@ func (d *deepGorm) queryCallback(db *gorm.DB) {
 			case string:
 				applyFilter(db, d.wildcards, index, cond, value)
 
-			case []string:
-				applyFilter(db, d.wildcards, index, cond, value)
-
 			case map[string]any:
 				applyFilter(db, d.wildcards, index, cond, value)
 			}
+
+		case clause.IN:
+			applyFilter(db, d.wildcards, index, cond, cond.Values)
 		}
 	}
 
 	return
 }
 
-func applyFilter(db *gorm.DB, wildcards bool, index int, cond clause.Eq, value any) {
+func applyFilter[C clause.Eq | clause.IN](db *gorm.DB, wildcards bool, index int, cond C, value any) {
 	concreteType := ensureNotASlice(reflect.TypeOf(db.Statement.Model))
 	inputObject := ensureConcrete(reflect.New(concreteType)).Interface()
 
-	columnString, ok := cond.Column.(string)
+	var columnString string
+	var ok bool
+
+	switch column := any(cond).(type) {
+	case clause.Eq:
+		columnString, ok = column.Column.(string)
+	case clause.IN:
+		columnString, ok = column.Column.(string)
+	}
+
 	if !ok {
 		return
 	}
@@ -86,5 +95,7 @@ func applyFilter(db *gorm.DB, wildcards bool, index int, cond clause.Eq, value a
 	}
 
 	// Replace the map filter with the newly created deep-filter
-	db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[index] = applied.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[0]
+	for _, expression := range applied.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs {
+		db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[index] = expression
+	}
 }

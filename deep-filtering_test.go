@@ -781,6 +781,32 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 			},
 			deepLike: true,
 		},
+		"2 from 2 with 2 filters and LIKE, but a slice of any": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Developer",
+					Name:       "John",
+				},
+				{
+					Occupation: "Opsie",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Developer",
+					Name:       "John",
+				},
+				{
+					Occupation: "Opsie",
+					Name:       "Jennifer",
+				},
+			},
+			filterMap: map[string]any{
+				"occupation": []any{"*sie", "*loper"},
+			},
+			deepLike: true,
+		},
 		"2 from 2 with 2 filters, only one LIKE": {
 			records: []*SimpleStruct6{
 				{

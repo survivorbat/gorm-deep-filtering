@@ -271,6 +271,36 @@ func TestDeepGorm_Initialize_TriggersFilteringCorrectly(t *testing.T) {
 			},
 			options: []Option{Wildcards()},
 		},
+		"filter with wildcards slice": {
+			filter: map[string]any{
+				"name": []string{"no*", "May*"},
+			},
+			existing: []ObjectA{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481688"),
+					Name: "ghi",
+				},
+				{
+					ID:   uuid.MustParse("3415d786-bc03-4543-aa3c-5ec9e55aa460"),
+					Name: "nope",
+				},
+				{
+					ID:   uuid.MustParse("383e9a9b-ef95-421d-a89e-60f0344ee29d"),
+					Name: "Maybe",
+				},
+			},
+			expected: []ObjectA{
+				{
+					ID:   uuid.MustParse("3415d786-bc03-4543-aa3c-5ec9e55aa460"),
+					Name: "nope",
+				},
+				{
+					ID:   uuid.MustParse("383e9a9b-ef95-421d-a89e-60f0344ee29d"),
+					Name: "Maybe",
+				},
+			},
+			options: []Option{Wildcards()},
+		},
 		"deep wildcard filter": {
 			filter: map[string]any{
 				"object_bs": map[string]any{

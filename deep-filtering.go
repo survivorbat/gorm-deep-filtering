@@ -141,6 +141,36 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 					shouldOr = true
 				}
 
+			case []any:
+				// Only wildcards if it's on and there are stars in the query
+				if !deepLike {
+					simpleFilter[fieldName] = givenFilter
+					continue
+				}
+
+				var shouldOr bool
+
+				for _, searchValue := range filterType {
+					whereFilter := fmt.Sprintf("%s = ?", fieldName)
+
+					switch searchString := searchValue.(type) {
+					case string:
+						if strings.Contains(searchString, "*") {
+							whereFilter = fmt.Sprintf("%s LIKE ?", fieldName)
+
+							searchValue = strings.ReplaceAll(searchString, "*", "%")
+						}
+					}
+
+					if shouldOr {
+						db = db.Or(whereFilter, searchValue)
+						continue
+					}
+
+					db = db.Where(whereFilter, searchValue)
+					shouldOr = true
+				}
+
 			// Simple filters (string, int, bool etc.)
 			default:
 				simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
