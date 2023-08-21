@@ -193,17 +193,18 @@ func getNestedType(naming schema.Namer, dbField *schema.Field, ofType reflect.Ty
 		fieldStructInstance: sourceStructType,
 	}
 
-	sourceForeignKey, ok := dbField.TagSettings["FOREIGNKEY"]
-	if ok {
-		result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, sourceForeignKey)
-		return result, nil
+	// Detetct many2many and foreignkey at the same time (fields can have both defined)
+	sourceForeignKey, sourceForeignKeyOk := dbField.TagSettings["FOREIGNKEY"]
+	manyToMany, manyToManyOk := dbField.TagSettings["MANY2MANY"]
+
+	if !sourceForeignKeyOk && !manyToManyOk {
+		return nil, fmt.Errorf("no 'foreignKey:...' or 'many2many:...' found in field %s", dbField.Name)
 	}
 
-	// No foreign key found, then it must be a manyToMany
-	manyToMany, ok := dbField.TagSettings["MANY2MANY"]
-
-	if !ok {
-		return nil, fmt.Errorf("no 'foreignKey:...' or 'many2many:...' found in field %s", dbField.Name)
+	// Only foreignkey
+	if sourceForeignKeyOk && !manyToManyOk {
+		result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, sourceForeignKey)
+		return result, nil
 	}
 
 	// Woah it's a many-to-many!
@@ -211,10 +212,20 @@ func getNestedType(naming schema.Namer, dbField *schema.Field, ofType reflect.Ty
 	result.manyToManyTable = manyToMany
 
 	// Based on the type we can just put _id behind it, again this only works with simple many-to-many structs
-	result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, ensureNotASlice(dbField.FieldType).Name()) + "_id"
+	fieldForeignKey, ok := dbField.TagSettings["JOINREFERENCES"]
+	if ok {
+		result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, fieldForeignKey)
+	} else {
+		result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, ensureNotASlice(dbField.FieldType).Name()) + "_id"
+	}
 
 	// Now the other table that we're getting information from.
-	result.destinationManyToManyForeignKey = naming.ColumnName(dbField.Schema.Table, ofType.Name()) + "_id"
+	destinationManyToManyForeignKey, ok := dbField.TagSettings["JOINFOREIGNKEY"]
+	if ok {
+		result.destinationManyToManyForeignKey = naming.ColumnName(dbField.Schema.Table, destinationManyToManyForeignKey)
+	} else {
+		result.destinationManyToManyForeignKey = naming.ColumnName(dbField.Schema.Table, ofType.Name()) + "_id"
+	}
 
 	return result, nil
 }
