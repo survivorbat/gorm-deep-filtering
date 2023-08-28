@@ -1,8 +1,13 @@
 # 🌌 Gorm Deep Filtering Plugin
 
 [![Go package](https://github.com/survivorbat/gorm-deep-filtering/actions/workflows/test.yaml/badge.svg)](https://github.com/survivorbat/gorm-deep-filtering/actions/workflows/test.yaml)
+![GitHub](https://img.shields.io/github/license/survivorbat/gorm-deep-filtering)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/survivorbat/gorm-deep-filtering)
 
 Ever wanted to filter objects on a deep level using only maps? This plugin allows you to do just that.
+
+There's also an experimental feature that turns wildcard queries (*) into LIKE queries, but this may be changed in
+the future.
 
 ```go
 package main
@@ -23,6 +28,13 @@ Is automatically turned into a query that looks like this:
 SELECT * FROM employees WHERE related_object_id IN (SELECT id FROM occupations WHERE title = "engineer")
 ```
 
+## 💡 Related Libraries
+
+- [gormlike](https://github.com/survivorbat/gorm-like) turns WHERE-calls into LIkE queries if certain tokens were found
+- [gormqonvert](https://github.com/survivorbat/gorm-query-convert) turns WHERE-calls into different queries if certain tokens were found
+- [gormcase](https://github.com/survivorbat/gorm-case) adds case insensitivity to WHERE queries
+- [gormtestutil](https://github.com/ing-bank/gormtestutil) provides easy utility methods for unit-testing with gorm
+
 ## ⬇️ Installation
 
 `go get github.com/survivorbat/gorm-deep-filtering`
@@ -39,7 +51,11 @@ import (
 func main() {
 	db, _ := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
 	
+	// Adds deep filtering
 	db.Use(deepgorm.New())
+	
+	// Turns strings with wildcards (*) into LIKE queries (EXPERIMENTAL FEATURE)
+	db.Use(deepgorm.New(deepgorm.Wildcards()))
 }
 
 ```

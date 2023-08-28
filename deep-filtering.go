@@ -2,8 +2,10 @@ package deepgorm
 
 import (
 	"fmt"
+	"github.com/survivorbat/go-tsyncmap"
 	"gorm.io/gorm/schema"
 	"reflect"
+	"strings"
 	"sync"
 
 	"gorm.io/gorm"
@@ -14,7 +16,7 @@ var (
 	// cache results for quick lookups. Just remember to reset it in unit tests ;-)
 
 	// cacheDatabaseMap map[string]map[string]*nestedType{}
-	cacheDatabaseMap = sync.Map{}
+	cacheDatabaseMap = tsyncmap.Map[string, map[string]*nestedType]{}
 
 	// schemaCache is for gorm's schema.Parse
 	schemaCache = sync.Map{}
@@ -67,6 +69,11 @@ var (
 //     For all the special (nested) structs, add a subquery that uses WHERE on the subquery.
 //  4. Add the simple filters to the query and return it.
 func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*gorm.DB, error) {
+	return addDeepFilters(db, objectType, false, filters...)
+}
+
+// addDeepFilters allows us to add wildcards without breaking AddDeepFilters
+func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[string]any) (*gorm.DB, error) {
 	schemaInfo, err := schema.Parse(objectType, &schemaCache, db.NamingStrategy)
 	if err != nil {
 		return nil, err
@@ -80,7 +87,7 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 	for _, filterObject := range filters {
 		// Go through all the keys of the filters
 		for fieldName, givenFilter := range filterObject {
-			switch givenFilter.(type) {
+			switch filterType := givenFilter.(type) {
 			// WithFilters for relational objects
 			case map[string]any:
 				fieldInfo, ok := relationalTypesInfo[fieldName]
@@ -96,6 +103,43 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 				}
 
 				db = query
+
+			case string:
+				// Only wildcards if it's on and there are stars in the query
+				if !deepLike || !strings.Contains(filterType, "*") {
+					simpleFilter[fieldName] = givenFilter
+					continue
+				}
+
+				whereFilter := fmt.Sprintf("%s LIKE ?", fieldName)
+				db = db.Where(whereFilter, strings.ReplaceAll(filterType, "*", "%"))
+
+			case []string:
+				// Only wildcards if it's on and there are stars in the query
+				if !deepLike {
+					simpleFilter[fieldName] = givenFilter
+					continue
+				}
+
+				var shouldOr bool
+
+				for _, searchString := range filterType {
+					whereFilter := fmt.Sprintf("%s = ?", fieldName)
+
+					if strings.Contains(searchString, "*") {
+						whereFilter = fmt.Sprintf("%s LIKE ?", fieldName)
+					}
+
+					searchString = strings.ReplaceAll(searchString, "*", "%")
+
+					if shouldOr {
+						db = db.Or(whereFilter, searchString)
+						continue
+					}
+
+					db = db.Where(whereFilter, searchString)
+					shouldOr = true
+				}
 
 			// Simple filters (string, int, bool etc.)
 			default:
@@ -249,7 +293,7 @@ func getDatabaseFieldsOfType(naming schema.Namer, schemaInfo *schema.Schema) map
 	reflectTypeName := reflectType.Name()
 
 	if dbFields, ok := cacheDatabaseMap.Load(reflectTypeName); ok {
-		return dbFields.(map[string]*nestedType)
+		return dbFields
 	}
 
 	var resultNestedType = map[string]*nestedType{}
