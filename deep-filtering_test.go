@@ -2,12 +2,14 @@ package deepgorm
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
+	"sync"
+	"testing"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
-	"reflect"
-	"sync"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -2347,6 +2349,106 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			// Arrange
 			database := newDatabase(t)
 			_ = database.AutoMigrate(&Resource{}, &Tag{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			query, err := AddDeepFilters(database, Resource{}, testData.filterMap...)
+
+			// Assert
+			assert.Nil(t, err)
+
+			if assert.NotNil(t, query) {
+				var result []Resource
+				res := query.Preload(clause.Associations).Find(&result)
+
+				// Handle error
+				assert.Nil(t, res.Error)
+
+				assert.EqualValues(t, testData.expected, result)
+			}
+		})
+	}
+}
+
+func TestAddDeepFilters_AddsDeepFiltersWithManyToManyCustomFields(t *testing.T) {
+	t.Parallel()
+	type End struct {
+		ID    uuid.UUID `gorm:"column:endId;primaryKey"`
+		Value string    `gorm:"column:endValue"`
+	}
+
+	type Middle struct {
+		ID         uuid.UUID `gorm:"column:middleId;primaryKey"`
+		ResourceId uuid.UUID `gorm:"column:resourceIdJ"`
+		EndId      uuid.UUID `gorm:"column:endIdJ"`
+	}
+
+	type Resource struct {
+		ID   uuid.UUID `gorm:"column:resourceId;primaryKey"`
+		Name string    `gorm:"column:resourceName"`
+		Ends []*End    `gorm:"many2many:middles;foreignKey:resourceId;joinForeignKey:resourceIdJ;References:endId;JoinReferences:endIdJ"`
+	}
+
+	tests := map[string]struct {
+		records   []*Resource
+		expected  []Resource
+		filterMap []map[string]any
+	}{
+		"looking for 1 resource": {
+			records: []*Resource{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+					Name: "TestResource",
+					Ends: []*End{
+						{
+							ID:    uuid.MustParse("c53184d8-e506-49f4-af18-93fb370f6df2"), // A
+							Value: "InfraNL",
+						},
+						{
+							ID:    uuid.MustParse("4de16d5f-c10f-4206-b6ce-c14997341113"), // B
+							Value: "Blub",
+						},
+					},
+				},
+			},
+			expected: []Resource{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+					Name: "TestResource",
+					Ends: []*End{
+						{
+							ID:    uuid.MustParse("c53184d8-e506-49f4-af18-93fb370f6df2"), // A
+							Value: "InfraNL",
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"ends": map[string]any{
+						"value": "InfraNL",
+					},
+				},
+			},
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := newDatabase(t)
+			database.NamingStrategy = schema.NamingStrategy{
+				SingularTable: true,
+				NoLowerCase:   false,
+				NameReplacer: strings.NewReplacer(
+					"resource_id_j", "resourceIdJ",
+					"end_id_j", "endIdJ",
+				),
+			}
+			_ = database.AutoMigrate(&Resource{}, &Middle{}, &End{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
