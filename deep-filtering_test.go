@@ -2108,8 +2108,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 					},
 				},
@@ -2121,16 +2121,16 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 					},
 				},
 			},
 			filterMap: map[string]any{
 				"tags": map[string]any{
-					"key":   "tenant",
-					"value": "InfraNL",
+					"key":   "subName",
+					"value": "Infrastructure",
 				},
 			},
 		},
@@ -2142,8 +2142,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 					},
 				},
@@ -2153,8 +2153,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "tenant",
-							Value: "OutraNL",
+							Key:   "subName",
+							Value: "Outrastructure",
 						},
 					},
 				},
@@ -2164,8 +2164,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-847a-d5e7be350090"),
-							Key:   "tenant",
-							Value: "OutraBE",
+							Key:   "subName",
+							Value: "MiddleStructure",
 						},
 					},
 				},
@@ -2177,8 +2177,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 					},
 				},
@@ -2188,16 +2188,16 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "tenant",
-							Value: "OutraNL",
+							Key:   "subName",
+							Value: "Outrastructure",
 						},
 					},
 				},
 			},
 			filterMap: map[string]any{
 				"tags": map[string]any{
-					"key":   "tenant",
-					"value": []string{"InfraNL", "OutraNL"},
+					"key":   "subName",
+					"value": []string{"Infrastructure", "Outrastructure"},
 				},
 			},
 		},
@@ -2259,13 +2259,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "pcode",
-							Value: "P02012",
+							Key:   "code",
+							Value: "ABC",
 						},
 					},
 				},
@@ -2277,13 +2277,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "pcode",
-							Value: "P02012",
+							Key:   "code",
+							Value: "ABC",
 						},
 					},
 				},
@@ -2291,14 +2291,14 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			filterMap: []map[string]any{
 				{
 					"tags": map[string]any{
-						"key":   "tenant",
-						"value": "InfraNL",
+						"key":   "subName",
+						"value": "Infrastructure",
 					},
 				},
 				{
 					"tags": map[string]any{
-						"key":   "pcode",
-						"value": "P02012",
+						"key":   "code",
+						"value": "ABC",
 					},
 				},
 			},
@@ -2311,13 +2311,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "pcode",
-							Value: "P02012",
+							Key:   "code",
+							Value: "ABC",
 						},
 					},
 				},
@@ -2327,13 +2327,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "tenant",
-							Value: "OutraNL",
+							Key:   "subName",
+							Value: "Outrastructure",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-736d-421f-897a-d5e7be359091"),
-							Key:   "pcode",
-							Value: "P02329",
+							Key:   "code",
+							Value: "DEF",
 						},
 					},
 				},
@@ -2343,13 +2343,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-847a-d5e7be350090"),
-							Key:   "tenant",
-							Value: "OutraBE",
+							Key:   "subName",
+							Value: "MiddleStructure",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359099"),
-							Key:   "pcode",
-							Value: "P02329",
+							Key:   "code",
+							Value: "DEF",
 						},
 					},
 				},
@@ -2361,13 +2361,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "tenant",
-							Value: "InfraNL",
+							Key:   "subName",
+							Value: "Infrastructure",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "pcode",
-							Value: "P02012",
+							Key:   "code",
+							Value: "ABC",
 						},
 					},
 				},
@@ -2377,13 +2377,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "tenant",
-							Value: "OutraNL",
+							Key:   "subName",
+							Value: "Outrastructure",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-736d-421f-897a-d5e7be359091"),
-							Key:   "pcode",
-							Value: "P02329",
+							Key:   "code",
+							Value: "DEF",
 						},
 					},
 				},
@@ -2391,14 +2391,14 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			filterMap: []map[string]any{
 				{
 					"tags": map[string]any{
-						"key":   "tenant",
-						"value": []string{"InfraNL", "OutraNL"},
+						"key":   "subName",
+						"value": []string{"Infrastructure", "Outrastructure"},
 					},
 				},
 				{
 					"tags": map[string]any{
-						"key":   "pcode",
-						"value": []string{"P02012", "P02329"},
+						"key":   "code",
+						"value": []string{"ABC", "DEF"},
 					},
 				},
 			},
