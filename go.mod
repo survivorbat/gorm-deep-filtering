@@ -1,6 +1,6 @@
 module github.com/survivorbat/gorm-deep-filtering
 
-go 1.18
+go 1.21.5
 
 require (
 	github.com/google/uuid v1.3.0
@@ -8,7 +8,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/survivorbat/go-tsyncmap v0.0.0
 	gorm.io/driver/sqlite v1.5.2
-	gorm.io/gorm v1.25.2-0.20230530020048-26663ab9bf55
+	gorm.io/gorm v1.25.5
 )
 
 require (
