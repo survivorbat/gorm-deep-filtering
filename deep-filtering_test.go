@@ -625,10 +625,9 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 	tests := map[string]struct {
 		records   []*SimpleStruct6
 		expected  []*SimpleStruct6
-		deepLike  bool
 		filterMap map[string]any
 	}{
-		"1 from 2": {
+		"first": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -649,7 +648,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"occupation": "Ops",
 			},
 		},
-		"2 from 3": {
+		"second": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -678,37 +677,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"occupation": "Ops",
 			},
 		},
-		"2 from 3 with LIKE": {
-			records: []*SimpleStruct6{
-				{
-					Occupation: "Dev",
-					Name:       "John",
-				},
-				{
-					Occupation: "Ops",
-					Name:       "Jennifer",
-				},
-				{
-					Occupation: "Ops",
-					Name:       "Roy",
-				},
-			},
-			expected: []*SimpleStruct6{
-				{
-					Occupation: "Dev",
-					Name:       "John",
-				},
-				{
-					Occupation: "Ops",
-					Name:       "Jennifer",
-				},
-			},
-			filterMap: map[string]any{
-				"name": "J*",
-			},
-			deepLike: true,
-		},
-		"1 from 2 with 2 filters": {
+		"third": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -730,7 +699,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"name":       "Jennifer",
 			},
 		},
-		"2 from 2 with 2 filters": {
+		"fourth": {
 			records: []*SimpleStruct6{
 				{
 					Occupation: "Dev",
@@ -755,58 +724,6 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				"occupation": []string{"Ops", "Dev"},
 			},
 		},
-		"2 from 2 with 2 filters and LIKE": {
-			records: []*SimpleStruct6{
-				{
-					Occupation: "Developer",
-					Name:       "John",
-				},
-				{
-					Occupation: "Opsie",
-					Name:       "Jennifer",
-				},
-			},
-			expected: []*SimpleStruct6{
-				{
-					Occupation: "Developer",
-					Name:       "John",
-				},
-				{
-					Occupation: "Opsie",
-					Name:       "Jennifer",
-				},
-			},
-			filterMap: map[string]any{
-				"occupation": []string{"*sie", "*loper"},
-			},
-			deepLike: true,
-		},
-		"2 from 2 with 2 filters, only one LIKE": {
-			records: []*SimpleStruct6{
-				{
-					Occupation: "Developer",
-					Name:       "John",
-				},
-				{
-					Occupation: "Opsie",
-					Name:       "Jennifer",
-				},
-			},
-			expected: []*SimpleStruct6{
-				{
-					Occupation: "Developer",
-					Name:       "John",
-				},
-				{
-					Occupation: "Opsie",
-					Name:       "Jennifer",
-				},
-			},
-			filterMap: map[string]any{
-				"occupation": []string{"Opsie", "*loper"},
-			},
-			deepLike: true,
-		},
 	}
 
 	for name, testData := range tests {
@@ -819,8 +736,8 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
-			// Act (this is cheating, but AddDeepFilters is simply a proxy anyway
-			query, err := addDeepFilters(database, SimpleStruct6{}, testData.deepLike, testData.filterMap)
+			// Act
+			query, err := AddDeepFilters(database, SimpleStruct6{}, testData.filterMap)
 
 			// Assert
 			assert.Nil(t, err)
@@ -2108,8 +2025,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 					},
 				},
@@ -2121,16 +2038,16 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 					},
 				},
 			},
 			filterMap: map[string]any{
 				"tags": map[string]any{
-					"key":   "subName",
-					"value": "Infrastructure",
+					"key":   "tenant",
+					"value": "InfraNL",
 				},
 			},
 		},
@@ -2142,8 +2059,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 					},
 				},
@@ -2153,8 +2070,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "subName",
-							Value: "Outrastructure",
+							Key:   "tenant",
+							Value: "OutraNL",
 						},
 					},
 				},
@@ -2164,8 +2081,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-847a-d5e7be350090"),
-							Key:   "subName",
-							Value: "MiddleStructure",
+							Key:   "tenant",
+							Value: "OutraBE",
 						},
 					},
 				},
@@ -2177,8 +2094,8 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 					},
 				},
@@ -2188,16 +2105,16 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "subName",
-							Value: "Outrastructure",
+							Key:   "tenant",
+							Value: "OutraNL",
 						},
 					},
 				},
 			},
 			filterMap: map[string]any{
 				"tags": map[string]any{
-					"key":   "subName",
-					"value": []string{"Infrastructure", "Outrastructure"},
+					"key":   "tenant",
+					"value": []string{"InfraNL", "OutraNL"},
 				},
 			},
 		},
@@ -2259,13 +2176,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "code",
-							Value: "ABC",
+							Key:   "pcode",
+							Value: "P02012",
 						},
 					},
 				},
@@ -2277,13 +2194,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "code",
-							Value: "ABC",
+							Key:   "pcode",
+							Value: "P02012",
 						},
 					},
 				},
@@ -2291,14 +2208,14 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			filterMap: []map[string]any{
 				{
 					"tags": map[string]any{
-						"key":   "subName",
-						"value": "Infrastructure",
+						"key":   "tenant",
+						"value": "InfraNL",
 					},
 				},
 				{
 					"tags": map[string]any{
-						"key":   "code",
-						"value": "ABC",
+						"key":   "pcode",
+						"value": "P02012",
 					},
 				},
 			},
@@ -2311,13 +2228,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "code",
-							Value: "ABC",
+							Key:   "pcode",
+							Value: "P02012",
 						},
 					},
 				},
@@ -2327,13 +2244,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "subName",
-							Value: "Outrastructure",
+							Key:   "tenant",
+							Value: "OutraNL",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-736d-421f-897a-d5e7be359091"),
-							Key:   "code",
-							Value: "DEF",
+							Key:   "pcode",
+							Value: "P02329",
 						},
 					},
 				},
@@ -2343,13 +2260,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-847a-d5e7be350090"),
-							Key:   "subName",
-							Value: "MiddleStructure",
+							Key:   "tenant",
+							Value: "OutraBE",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359099"),
-							Key:   "code",
-							Value: "DEF",
+							Key:   "pcode",
+							Value: "P02329",
 						},
 					},
 				},
@@ -2361,13 +2278,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359090"),
-							Key:   "subName",
-							Value: "Infrastructure",
+							Key:   "tenant",
+							Value: "InfraNL",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be359091"),
-							Key:   "code",
-							Value: "ABC",
+							Key:   "pcode",
+							Value: "P02012",
 						},
 					},
 				},
@@ -2377,13 +2294,13 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 					Tags: []*Tag{
 						{
 							ID:    uuid.MustParse("0e2cdda8-734d-421f-897a-d5e7be350090"),
-							Key:   "subName",
-							Value: "Outrastructure",
+							Key:   "tenant",
+							Value: "OutraNL",
 						},
 						{
 							ID:    uuid.MustParse("0e2cdda8-736d-421f-897a-d5e7be359091"),
-							Key:   "code",
-							Value: "DEF",
+							Key:   "pcode",
+							Value: "P02329",
 						},
 					},
 				},
@@ -2391,14 +2308,14 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			filterMap: []map[string]any{
 				{
 					"tags": map[string]any{
-						"key":   "subName",
-						"value": []string{"Infrastructure", "Outrastructure"},
+						"key":   "tenant",
+						"value": []string{"InfraNL", "OutraNL"},
 					},
 				},
 				{
 					"tags": map[string]any{
-						"key":   "code",
-						"value": []string{"ABC", "DEF"},
+						"key":   "pcode",
+						"value": []string{"P02012", "P02329"},
 					},
 				},
 			},

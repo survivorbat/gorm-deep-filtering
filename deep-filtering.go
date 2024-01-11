@@ -5,7 +5,6 @@ import (
 	"github.com/survivorbat/go-tsyncmap"
 	"gorm.io/gorm/schema"
 	"reflect"
-	"strings"
 	"sync"
 
 	"gorm.io/gorm"
@@ -69,11 +68,6 @@ var (
 //     For all the special (nested) structs, add a subquery that uses WHERE on the subquery.
 //  4. Add the simple filters to the query and return it.
 func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*gorm.DB, error) {
-	return addDeepFilters(db, objectType, false, filters...)
-}
-
-// addDeepFilters allows us to add wildcards without breaking AddDeepFilters
-func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[string]any) (*gorm.DB, error) {
 	schemaInfo, err := schema.Parse(objectType, &schemaCache, db.NamingStrategy)
 	if err != nil {
 		return nil, err
@@ -87,7 +81,7 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 	for _, filterObject := range filters {
 		// Go through all the keys of the filters
 		for fieldName, givenFilter := range filterObject {
-			switch filterType := givenFilter.(type) {
+			switch givenFilter.(type) {
 			// WithFilters for relational objects
 			case map[string]any:
 				fieldInfo, ok := relationalTypesInfo[fieldName]
@@ -103,43 +97,6 @@ func addDeepFilters(db *gorm.DB, objectType any, deepLike bool, filters ...map[s
 				}
 
 				db = query
-
-			case string:
-				// Only wildcards if it's on and there are stars in the query
-				if !deepLike || !strings.Contains(filterType, "*") {
-					simpleFilter[fieldName] = givenFilter
-					continue
-				}
-
-				whereFilter := fmt.Sprintf("%s LIKE ?", fieldName)
-				db = db.Where(whereFilter, strings.ReplaceAll(filterType, "*", "%"))
-
-			case []string:
-				// Only wildcards if it's on and there are stars in the query
-				if !deepLike {
-					simpleFilter[fieldName] = givenFilter
-					continue
-				}
-
-				var shouldOr bool
-
-				for _, searchString := range filterType {
-					whereFilter := fmt.Sprintf("%s = ?", fieldName)
-
-					if strings.Contains(searchString, "*") {
-						whereFilter = fmt.Sprintf("%s LIKE ?", fieldName)
-					}
-
-					searchString = strings.ReplaceAll(searchString, "*", "%")
-
-					if shouldOr {
-						db = db.Or(whereFilter, searchString)
-						continue
-					}
-
-					db = db.Where(whereFilter, searchString)
-					shouldOr = true
-				}
 
 			// Simple filters (string, int, bool etc.)
 			default:
@@ -221,9 +178,10 @@ func getInstanceAndRelationOfField(fieldType reflect.Type) (any, string) {
 	case reflect.Slice:
 		elementType := ensureNotASlice(valueType)
 		return reflect.New(elementType).Interface(), "manyToOne"
-	}
 
-	return nil, ""
+	default:
+		return nil, ""
+	}
 }
 
 // getNestedType Returns information about the struct field in a nestedType object. Used to figure out
