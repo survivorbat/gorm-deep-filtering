@@ -31,8 +31,17 @@ func queryCallback(db *gorm.DB) {
 		return
 	}
 
-	for index, cond := range exp.Exprs {
+	createDeepFilterRecursively(exp.Exprs, db)
+
+	return
+}
+
+func createDeepFilterRecursively(exprs []clause.Expression, db *gorm.DB) {
+	for index, cond := range exprs {
 		switch cond := cond.(type) {
+		case clause.AndConditions:
+			createDeepFilterRecursively(exprs[index].(clause.AndConditions).Exprs, db)
+
 		case clause.Eq:
 			switch value := cond.Value.(type) {
 			case map[string]any:
@@ -47,10 +56,8 @@ func queryCallback(db *gorm.DB) {
 				}
 
 				// Replace the map filter with the newly created deep-filter
-				db.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[index] = applied.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[0]
+				exprs[index] = applied.Statement.Clauses["WHERE"].Expression.(clause.Where).Exprs[0]
 			}
 		}
 	}
-
-	return
 }
