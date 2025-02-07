@@ -41,7 +41,8 @@ func createDeepFilterRecursively(exprs []clause.Expression, db *gorm.DB) {
 		switch cond := cond.(type) {
 		case clause.AndConditions:
 			createDeepFilterRecursively(exprs[index].(clause.AndConditions).Exprs, db)
-
+		case clause.OrConditions:
+			createDeepFilterRecursively(exprs[index].(clause.OrConditions).Exprs, db)
 		case clause.Eq:
 			switch value := cond.Value.(type) {
 			case map[string]any:
