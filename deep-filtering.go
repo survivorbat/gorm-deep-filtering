@@ -283,25 +283,26 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 
 	switch fieldInfo.relationType {
 	case "oneToMany":
-		whereQuery := fmt.Sprintf("%s IN (?)", fieldInfo.fieldForeignKey)
-
 		// SELECT * FROM <table> WHERE fieldInfo.fieldForeignKey IN (SELECT id FROM fieldInfo.fieldStructInstance WHERE givenFilter)
-		return db.Where(whereQuery, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(filter)), nil
+		whereQuery := fmt.Sprintf("%s IN (?)", fieldInfo.fieldForeignKey)
+		subQuery, err := AddDeepFilters(cleanDB, fieldInfo.fieldStructInstance, filter.(map[string]any))
+
+		return db.Where(whereQuery, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery)), err
 
 	case "manyToOne":
 		// SELECT * FROM <table> WHERE id IN (SELECT fieldInfo.fieldStructInstance FROM fieldInfo.fieldStructInstance WHERE filter)
-		return db.Where("id IN (?)", cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldForeignKey).Where(filter)), nil
+		subQuery, err := AddDeepFilters(cleanDB, fieldInfo.fieldStructInstance, filter.(map[string]any))
+
+		return db.Where("id IN (?)", cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldForeignKey).Where(subQuery)), err
 
 	case "manyToMany":
-		// The one on the 'other' object
-		subSubQuery := cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(filter)
+		// SELECT * FROM <table> WHERE id IN (SELECT <table>_id FROM fieldInfo.fieldForeignKey WHERE <other_table>_id IN (SELECT id FROM <other_table> WHERE givenFilter))
 
 		// The one that connects the objects
 		subWhere := fmt.Sprintf("%s IN (?)", fieldInfo.fieldForeignKey)
-		subQuery := cleanDB.Table(fieldInfo.manyToManyTable).Select(fieldInfo.destinationManyToManyForeignKey).Where(subWhere, subSubQuery)
+		subQuery, err := AddDeepFilters(cleanDB, fieldInfo.fieldStructInstance, filter.(map[string]any))
 
-		// SELECT * FROM <table> WHERE id IN (SELECT <table>_id FROM fieldInfo.fieldForeignKey WHERE <other_table>_id IN (SELECT id FROM <other_table> WHERE givenFilter))
-		return db.Where("id IN (?)", subQuery), nil
+		return db.Where("id IN (?)", cleanDB.Table(fieldInfo.manyToManyTable).Select(fieldInfo.destinationManyToManyForeignKey).Where(subWhere, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery))), err
 	}
 
 	return nil, fmt.Errorf("relationType '%s' unknown", fieldInfo.relationType)

@@ -2,11 +2,12 @@ package deepgorm
 
 import (
 	"fmt"
-	"github.com/ing-bank/gormtestutil"
-	"gorm.io/gorm/schema"
 	"reflect"
 	"sync"
 	"testing"
+
+	"github.com/ing-bank/gormtestutil"
+	"gorm.io/gorm/schema"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -1208,12 +1209,19 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 }
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) {
-	t.Parallel()
+
+	type TagValue struct {
+		ID    uuid.UUID
+		Value string
+	}
+
 	type Tag struct {
 		ID               uuid.UUID
 		Key              string
 		Value            string
 		ComplexStructRef uuid.UUID
+		TagValueRef      uuid.UUID
+		TagValue         *TagValue `gorm:"foreignKey:TagValueRef"`
 	}
 
 	type ComplexStruct3 struct {
@@ -1238,6 +1246,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "type",
 							Value:            "interpreted",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+								Value: "test-python-value",
+							},
 						},
 					},
 				},
@@ -1250,6 +1262,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 							Key:              "type",
 							Value:            "compiled",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-go-value",
+							},
 						},
 					},
 				},
@@ -1264,6 +1280,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "type",
 							Value:            "interpreted",
+							TagValueRef:      uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
 						},
 					},
 				},
@@ -1291,12 +1308,20 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 						{
 							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "not-like",
 							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
 						},
 					},
 				},
@@ -1309,6 +1334,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 					},
 				},
@@ -1321,12 +1350,20 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 							Key:              "type",
 							Value:            "interpret",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e01390c4-485d-459f-958a-3d264659a70d"),
+								Value: "test-ruby-value",
+							},
 						},
 						{
 							ID:               uuid.MustParse("8927cd8b-ebb8-4119-93d5-cbe605d8f668"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 							Key:              "not-like",
 							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
 						},
 					},
 				},
@@ -1341,12 +1378,14 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValueRef:      uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
 						},
 						{
 							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "not-like",
 							Value:            "python",
+							TagValueRef:      uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
 						},
 					},
 				},
@@ -1377,6 +1416,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 					},
 				},
@@ -1389,6 +1432,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 					},
 				},
@@ -1409,15 +1456,184 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 				},
 			},
 		},
+		"single query multiple layers of nesting": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					Name: "Python",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "type",
+							Value:            "interpreted",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
+					Name: "Go",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "compiled",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e75a2f7e-0e1c-4f9c-a8ce-af90f1b64baa"),
+								Value: "test-go-value",
+							},
+						},
+					},
+				},
+			},
+			expected: []ComplexStruct3{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					Name: "Python",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "type",
+							Value:            "interpreted",
+							TagValueRef:      uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"value": "test-python-value",
+						},
+					},
+				},
+			},
+		},
+		"multi query multiple layers of nesting": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
+					Name: "Typescript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
+					Name: "Javascript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
+					Name: "Ruby",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "interpret",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e01390c4-485d-459f-958a-3d264659a70d"),
+								Value: "test-ruby-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8927cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+			},
+			expected: []ComplexStruct3{
+				{
+					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
+					Name: "Typescript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValueRef:      uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+						},
+						{
+							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValueRef:      uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"value": "test-python-value",
+						},
+					},
+				},
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"value": "test-js-value",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, testData := range tests {
 		testData := testData
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
-			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{})
+			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{}, &TagValue{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
@@ -1429,6 +1645,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 
 			if assert.NotNil(t, query) {
 				var result []ComplexStruct3
+
 				res := query.Preload(clause.Associations).Find(&result)
 
 				// Handle error
