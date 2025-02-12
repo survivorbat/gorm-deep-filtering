@@ -1826,7 +1826,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) 
 			records: []*ManyA{
 				{
 					ID: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
-					A:  "Hello",
+					A:  "hello",
 					ManyBs: []*ManyB{
 						{
 							ID: uuid.MustParse("9f1baf72-6ca5-4d43-8a01-d845575620e1"),
@@ -1848,7 +1848,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) 
 			records: []*ManyA{
 				{
 					ID: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
-					A:  "Hello",
+					A:  "hello",
 					ManyBs: []*ManyB{
 						{
 							ID: uuid.MustParse("9f1baf72-6ca5-4d43-8a01-d845575620e1"),
