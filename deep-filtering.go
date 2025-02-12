@@ -22,7 +22,7 @@ var (
 	// schemaCache is for gorm's schema.Parse
 	schemaCache = sync.Map{}
 
-	// Errors
+	// ErrFieldDoesNotExist is returned if the Where condition contains unknown fields
 	ErrFieldDoesNotExist = errors.New("field does not exist")
 )
 
