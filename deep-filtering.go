@@ -100,6 +100,9 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 
 			// Simple filters (string, int, bool etc.)
 			default:
+				if _, ok := schemaInfo.FieldsByDBName[fieldName]; !ok {
+					return nil, fmt.Errorf("field '%s.%s' does not exist", schemaInfo.Table, fieldName)
+				}
 				simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
 			}
 		}
@@ -287,11 +290,19 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 		whereQuery := fmt.Sprintf("%s IN (?)", fieldInfo.fieldForeignKey)
 		subQuery, err := AddDeepFilters(cleanDB, fieldInfo.fieldStructInstance, filter.(map[string]any))
 
+		if err != nil {
+			return nil, err
+		}
+
 		return db.Where(whereQuery, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery)), err
 
 	case "manyToOne":
 		// SELECT * FROM <table> WHERE id IN (SELECT fieldInfo.fieldStructInstance FROM fieldInfo.fieldStructInstance WHERE filter)
 		subQuery, err := AddDeepFilters(cleanDB, fieldInfo.fieldStructInstance, filter.(map[string]any))
+
+		if err != nil {
+			return nil, err
+		}
 
 		return db.Where("id IN (?)", cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldForeignKey).Where(subQuery)), err
 
@@ -301,6 +312,10 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 		// The one that connects the objects
 		subWhere := fmt.Sprintf("%s IN (?)", fieldInfo.fieldForeignKey)
 		subQuery, err := AddDeepFilters(cleanDB, fieldInfo.fieldStructInstance, filter.(map[string]any))
+
+		if err != nil {
+			return nil, err
+		}
 
 		return db.Where("id IN (?)", cleanDB.Table(fieldInfo.manyToManyTable).Select(fieldInfo.destinationManyToManyForeignKey).Where(subWhere, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery))), err
 	}

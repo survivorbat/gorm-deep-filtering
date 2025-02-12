@@ -42,6 +42,52 @@ type ManyB struct {
 	ManyAs []*ManyA `gorm:"many2many:a_b"`
 }
 
+type TagValue struct {
+	ID    uuid.UUID
+	Value string
+}
+
+type Tag struct {
+	ID               uuid.UUID
+	Key              string
+	Value            string
+	ComplexStructRef uuid.UUID
+	TagValueRef      uuid.UUID
+	TagValue         *TagValue `gorm:"foreignKey:TagValueRef"`
+}
+
+type SimpleTag struct {
+	ID               uuid.UUID
+	Key              string
+	Value            string
+	ComplexStructRef uuid.UUID
+}
+
+type NestedStruct4 struct {
+	ID         uuid.UUID
+	Name       string
+	Occupation string
+}
+
+type ComplexStruct1 struct {
+	ID        uuid.UUID
+	Value     int
+	Nested    *NestedStruct4 `gorm:"foreignKey:NestedRef"`
+	NestedRef uuid.UUID
+}
+
+type ComplexStruct2 struct {
+	ID   uuid.UUID
+	Name string
+	Tags []*SimpleTag `gorm:"foreignKey:ComplexStructRef"`
+}
+
+type ComplexStruct3 struct {
+	ID   uuid.UUID
+	Name string
+	Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
+}
+
 // Tests
 
 func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
@@ -755,19 +801,6 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 	t.Parallel()
-	type NestedStruct4 struct {
-		ID         uuid.UUID
-		Name       string
-		Occupation string
-	}
-
-	type ComplexStruct1 struct {
-		ID        uuid.UUID
-		Value     int
-		Nested    *NestedStruct4 `gorm:"foreignKey:NestedRef"`
-		NestedRef uuid.UUID
-	}
-
 	tests := map[string]struct {
 		records   []*ComplexStruct1
 		expected  []ComplexStruct1
@@ -1004,19 +1037,6 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T) {
 	t.Parallel()
-	type Tag struct {
-		ID               uuid.UUID
-		Key              string
-		Value            string
-		ComplexStructRef uuid.UUID
-	}
-
-	type ComplexStruct2 struct {
-		ID   uuid.UUID
-		Name string
-		Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
-	}
-
 	tests := map[string]struct {
 		records   []*ComplexStruct2
 		expected  []ComplexStruct2
@@ -1027,7 +1047,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1039,7 +1059,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
 					Name: "Go",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1053,7 +1073,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1075,7 +1095,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1087,7 +1107,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1099,7 +1119,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
 					Name: "Ruby",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1113,7 +1133,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1125,7 +1145,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1147,7 +1167,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1159,7 +1179,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1185,7 +1205,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
-			_ = database.AutoMigrate(&ComplexStruct2{}, &Tag{})
+			_ = database.AutoMigrate(&ComplexStruct2{}, &SimpleTag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
@@ -1209,27 +1229,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 }
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) {
-
-	type TagValue struct {
-		ID    uuid.UUID
-		Value string
-	}
-
-	type Tag struct {
-		ID               uuid.UUID
-		Key              string
-		Value            string
-		ComplexStructRef uuid.UUID
-		TagValueRef      uuid.UUID
-		TagValue         *TagValue `gorm:"foreignKey:TagValueRef"`
-	}
-
-	type ComplexStruct3 struct {
-		ID   uuid.UUID
-		Name string
-		Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
-	}
-
+	t.Parallel()
 	tests := map[string]struct {
 		records   []*ComplexStruct3
 		expected  []ComplexStruct3
@@ -1631,6 +1631,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 	for name, testData := range tests {
 		testData := testData
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{}, &TagValue{})
@@ -1653,6 +1654,236 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 
 				assert.EqualValues(t, testData.expected, result)
 			}
+		})
+	}
+}
+
+func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		records          []*ComplexStruct3
+		filterMap        []map[string]any
+		expectedErrorMsg string
+	}{
+		"simple filter": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					Name: "Python",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "type",
+							Value:            "interpreted",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
+					Name: "Go",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "compiled",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e75a2f7e-0e1c-4f9c-a8ce-af90f1b64baa"),
+								Value: "test-go-value",
+							},
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"key": "test-python-value",
+						},
+					},
+				},
+			},
+			expectedErrorMsg: "field 'tag_values.key' does not exist",
+		},
+		"nested filter": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
+					Name: "Typescript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
+					Name: "Javascript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
+					Name: "Ruby",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "interpret",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e01390c4-485d-459f-958a-3d264659a70d"),
+								Value: "test-ruby-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8927cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_key": map[string]any{
+							"value": "test-python-value",
+						},
+					},
+				},
+			},
+			expectedErrorMsg: "field 'tag_key' does not exist",
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{}, &TagValue{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			_, err := AddDeepFilters(database, ComplexStruct3{}, testData.filterMap...)
+
+			// Assert
+			assert.Error(t, err)
+			assert.Equal(t, testData.expectedErrorMsg, err.Error())
+		})
+	}
+}
+
+func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		records          []*ManyA
+		filterMap        []map[string]any
+		expectedErrorMsg string
+	}{
+		"simple filter": {
+			records: []*ManyA{
+				{
+					ID: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					A:  "Hello",
+					ManyBs: []*ManyB{
+						{
+							ID: uuid.MustParse("9f1baf72-6ca5-4d43-8a01-d845575620e1"),
+							B:  "world",
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"many_bs": map[string]any{
+						"a": "world",
+					},
+				},
+			},
+			expectedErrorMsg: "field 'many_bs.a' does not exist",
+		},
+		"nested filter": {
+			records: []*ManyA{
+				{
+					ID: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					A:  "Hello",
+					ManyBs: []*ManyB{
+						{
+							ID: uuid.MustParse("9f1baf72-6ca5-4d43-8a01-d845575620e1"),
+							B:  "world",
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"many_b": map[string]any{
+						"b": "world",
+					},
+				},
+			},
+			expectedErrorMsg: "field 'many_b' does not exist",
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			_ = database.AutoMigrate(&ManyA{}, &ManyB{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			_, err := AddDeepFilters(database, ManyA{}, testData.filterMap...)
+
+			// Assert
+			assert.Error(t, err)
+			assert.Equal(t, testData.expectedErrorMsg, err.Error())
 		})
 	}
 }
