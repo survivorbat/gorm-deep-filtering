@@ -1,11 +1,13 @@
 package deepgorm
 
 import (
+	"errors"
 	"fmt"
-	"github.com/survivorbat/go-tsyncmap"
-	"gorm.io/gorm/schema"
 	"reflect"
 	"sync"
+
+	"github.com/survivorbat/go-tsyncmap"
+	"gorm.io/gorm/schema"
 
 	"gorm.io/gorm"
 )
@@ -19,6 +21,9 @@ var (
 
 	// schemaCache is for gorm's schema.Parse
 	schemaCache = sync.Map{}
+
+	// Errors
+	ErrFieldDoesNotExist = errors.New("field does not exist")
 )
 
 // AddDeepFilters / addDeepFilter godoc
@@ -87,7 +92,7 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 				fieldInfo, ok := relationalTypesInfo[fieldName]
 
 				if !ok {
-					return nil, fmt.Errorf("field '%s' does not exist", fieldName)
+					return nil, fmt.Errorf("failed to add filters for '%s.%s': %w", schemaInfo.Table, fieldName, ErrFieldDoesNotExist)
 				}
 
 				// We have 2 db objects because if we use 'result' to create subqueries it will cause a stackoverflow.
@@ -101,7 +106,7 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 			// Simple filters (string, int, bool etc.)
 			default:
 				if _, ok := schemaInfo.FieldsByDBName[fieldName]; !ok {
-					return nil, fmt.Errorf("field '%s.%s' does not exist", schemaInfo.Table, fieldName)
+					return nil, fmt.Errorf("failed to add filters for '%s.%s': %w", schemaInfo.Table, fieldName, ErrFieldDoesNotExist)
 				}
 				simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
 			}
@@ -294,7 +299,7 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 			return nil, err
 		}
 
-		return db.Where(whereQuery, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery)), err
+		return db.Where(whereQuery, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery)), nil
 
 	case "manyToOne":
 		// SELECT * FROM <table> WHERE id IN (SELECT fieldInfo.fieldStructInstance FROM fieldInfo.fieldStructInstance WHERE filter)
@@ -304,7 +309,7 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 			return nil, err
 		}
 
-		return db.Where("id IN (?)", cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldForeignKey).Where(subQuery)), err
+		return db.Where("id IN (?)", cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldForeignKey).Where(subQuery)), nil
 
 	case "manyToMany":
 		// SELECT * FROM <table> WHERE id IN (SELECT <table>_id FROM fieldInfo.fieldForeignKey WHERE <other_table>_id IN (SELECT id FROM <other_table> WHERE givenFilter))
@@ -317,7 +322,7 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 			return nil, err
 		}
 
-		return db.Where("id IN (?)", cleanDB.Table(fieldInfo.manyToManyTable).Select(fieldInfo.destinationManyToManyForeignKey).Where(subWhere, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery))), err
+		return db.Where("id IN (?)", cleanDB.Table(fieldInfo.manyToManyTable).Select(fieldInfo.destinationManyToManyForeignKey).Where(subWhere, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery))), nil
 	}
 
 	return nil, fmt.Errorf("relationType '%s' unknown", fieldInfo.relationType)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm/clause"
 )
 
@@ -603,6 +604,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 		records   []*SimpleStruct5
 		filterMap map[string]any
 		fieldName string
+		tableName string
 	}{
 		"first": {
 			records: []*SimpleStruct5{
@@ -619,6 +621,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 				"probation": map[string]any{},
 			},
 			fieldName: "probation",
+			tableName: "simple_struct5",
 		},
 		"second": {
 			records: []*SimpleStruct5{
@@ -635,6 +638,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 				"does_not_exist": map[string]any{},
 			},
 			fieldName: "does_not_exist",
+			tableName: "simple_struct5",
 		},
 	}
 
@@ -655,7 +659,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 			assert.Nil(t, query)
 
 			if assert.NotNil(t, err) {
-				expectedError := fmt.Sprintf("field '%v' does not exist", testData.fieldName)
+				expectedError := fmt.Sprintf("failed to add filters for '%s.%s': field does not exist", testData.tableName, testData.fieldName)
 				assert.Equal(t, expectedError, err.Error())
 			}
 		})
@@ -1709,7 +1713,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorMsg: "field 'tag_values.key' does not exist",
+			expectedErrorMsg: "failed to add filters for 'tag_values.key': field does not exist",
 		},
 		"nested filter": {
 			records: []*ComplexStruct3{
@@ -1791,7 +1795,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorMsg: "field 'tag_key' does not exist",
+			expectedErrorMsg: "failed to add filters for 'tags.tag_key': field does not exist",
 		},
 	}
 
@@ -1809,8 +1813,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 			_, err := AddDeepFilters(database, ComplexStruct3{}, testData.filterMap...)
 
 			// Assert
-			assert.Error(t, err)
-			assert.Equal(t, testData.expectedErrorMsg, err.Error())
+			require.ErrorContains(t, err, testData.expectedErrorMsg)
 		})
 	}
 }
@@ -1842,7 +1845,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) 
 					},
 				},
 			},
-			expectedErrorMsg: "field 'many_bs.a' does not exist",
+			expectedErrorMsg: "failed to add filters for 'many_bs.a': field does not exist",
 		},
 		"nested filter": {
 			records: []*ManyA{
@@ -1864,7 +1867,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) 
 					},
 				},
 			},
-			expectedErrorMsg: "field 'many_b' does not exist",
+			expectedErrorMsg: "failed to add filters for 'many_as.many_b': field does not exist",
 		},
 	}
 
@@ -1882,8 +1885,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) 
 			_, err := AddDeepFilters(database, ManyA{}, testData.filterMap...)
 
 			// Assert
-			assert.Error(t, err)
-			assert.Equal(t, testData.expectedErrorMsg, err.Error())
+			require.ErrorContains(t, err, testData.expectedErrorMsg)
 		})
 	}
 }
