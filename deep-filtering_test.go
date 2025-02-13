@@ -1802,7 +1802,6 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 	for name, testData := range tests {
 		testData := testData
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{}, &TagValue{})
