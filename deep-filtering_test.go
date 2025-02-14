@@ -1460,7 +1460,46 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 				},
 			},
 		},
-		"single query multiple layers of nesting": {
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			query, err := AddDeepFilters(database, ComplexStruct3{}, testData.filterMap...)
+
+			// Assert
+			assert.Nil(t, err)
+
+			if assert.NotNil(t, query) {
+				var result []ComplexStruct3
+
+				res := query.Preload(clause.Associations).Find(&result)
+
+				// Handle error
+				assert.Nil(t, res.Error)
+
+				assert.EqualValues(t, testData.expected, result)
+			}
+		})
+	}
+}
+
+func TestAddDeepFilters_AddsDeepFiltersMultipleLayersOfNesting(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		records   []*ComplexStruct3
+		expected  []ComplexStruct3
+		filterMap []map[string]any
+	}{
+		"single query": {
 			records: []*ComplexStruct3{
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
@@ -1520,7 +1559,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 				},
 			},
 		},
-		"multi query multiple layers of nesting": {
+		"multi query": {
 			records: []*ComplexStruct3{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
@@ -1638,7 +1677,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
-			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{}, &TagValue{})
+			err := database.AutoMigrate(&TagValue{}, &Tag{}, &ComplexStruct3{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
@@ -1669,7 +1708,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 		filterMap        []map[string]any
 		expectedErrorMsg string
 	}{
-		"simple filter": {
+		"one to many filter": {
 			records: []*ComplexStruct3{
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
@@ -1715,7 +1754,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 			},
 			expectedErrorMsg: "failed to add filters for 'tag_values.key': field does not exist",
 		},
-		"nested filter": {
+		"many to one filter": {
 			records: []*ComplexStruct3{
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
@@ -1802,6 +1841,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 	for name, testData := range tests {
 		testData := testData
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
 			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{}, &TagValue{})

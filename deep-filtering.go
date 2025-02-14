@@ -258,7 +258,10 @@ func getDatabaseFieldsOfType(naming schema.Namer, schemaInfo *schema.Schema) map
 	reflectType := ensureConcrete(schemaInfo.ModelType)
 	reflectTypeName := reflectType.Name()
 
-	if dbFields, ok := cacheDatabaseMap.Load(reflectTypeName); ok {
+	// The len(dbFields) check is needed here because when running the unit tests
+	// it fell into a race condition where it had the map key already stored but not the value yet.
+	// Resulting in some fields reported falsely as non existent
+	if dbFields, ok := cacheDatabaseMap.Load(reflectTypeName); ok && len(dbFields) != 0 {
 		return dbFields
 	}
 
