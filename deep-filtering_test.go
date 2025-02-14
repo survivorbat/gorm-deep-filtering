@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/survivorbat/go-tsyncmap"
 	"gorm.io/gorm/clause"
 )
 
@@ -93,6 +94,7 @@ type ComplexStruct3 struct {
 
 func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct1 struct {
 		//nolint
@@ -114,6 +116,7 @@ func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
 
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeFields(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct2 struct {
 		ID         int
@@ -148,6 +151,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeFields(t *testing.T) {
 
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeOfSliceFields(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct3 struct {
 		ID                int
@@ -182,6 +186,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeOfSliceFields(t *testing.T) {
 
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeFieldsOnConsecutiveCalls(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct4 struct {
 		Name       string
@@ -214,6 +219,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeFieldsOnConsecutiveCalls(t *te
 
 func TestEnsureConcrete_TurnsTypeTestAIntoValue(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 	reflectPointer := reflect.TypeOf(&TestA{})
@@ -229,6 +235,7 @@ func TestEnsureConcrete_TurnsTypeTestAIntoValue(t *testing.T) {
 
 func TestEnsureConcrete_TurnsTypeTestBIntoValue(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectPointer := reflect.TypeOf(&TestB{})
@@ -244,6 +251,7 @@ func TestEnsureConcrete_TurnsTypeTestBIntoValue(t *testing.T) {
 
 func TestEnsureConcrete_TurnsTypeTestAIntoValueWithMultiplePointers(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 
@@ -264,6 +272,7 @@ func TestEnsureConcrete_TurnsTypeTestAIntoValueWithMultiplePointers(t *testing.T
 
 func TestEnsureConcrete_LeavesValueOfTypeTestAAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 	reflectValue := reflect.TypeOf(TestA{})
@@ -277,6 +286,7 @@ func TestEnsureConcrete_LeavesValueOfTypeTestAAlone(t *testing.T) {
 
 func TestEnsureConcrete_LeavesValueOfTypeTestBAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf(TestB{})
@@ -290,6 +300,7 @@ func TestEnsureConcrete_LeavesValueOfTypeTestBAlone(t *testing.T) {
 
 func TestEnsureNotASlice_LeavesValueOfTypeTestAAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 	reflectValue := reflect.TypeOf([]*TestA{})
@@ -304,6 +315,7 @@ func TestEnsureNotASlice_LeavesValueOfTypeTestAAlone(t *testing.T) {
 
 func TestEnsureNotASlice_LeavesValueOfTypeTestBAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf(TestB{})
@@ -317,6 +329,7 @@ func TestEnsureNotASlice_LeavesValueOfTypeTestBAlone(t *testing.T) {
 
 func TestEnsureNotASlice_ReturnsExpectedType(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf([]TestB{})
@@ -331,6 +344,7 @@ func TestEnsureNotASlice_ReturnsExpectedType(t *testing.T) {
 
 func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSlice(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf([][][][][][][][][][]TestB{})
@@ -345,6 +359,7 @@ func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSlice(t *testing.T) {
 
 func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSliceAndPointers(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf([]*[][]*[]*[][]*[]*[][]*[]*TestB{})
@@ -359,6 +374,7 @@ func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSliceAndPointers(t *testing.T)
 
 func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnStruct(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestStruct struct{}
 	input := reflect.TypeOf(TestStruct{})
@@ -373,6 +389,7 @@ func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnStruct(t *tes
 
 func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnSlice(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestStruct struct{}
 	input := reflect.TypeOf([]TestStruct{})
@@ -387,6 +404,7 @@ func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnSlice(t *test
 
 func TestGetInstanceAndValueTypeInfoOfField_ReturnsNilOnNonStructUnknownType(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	input := reflect.TypeOf(0)
 
@@ -400,6 +418,7 @@ func TestGetInstanceAndValueTypeInfoOfField_ReturnsNilOnNonStructUnknownType(t *
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type NestedStruct1 struct {
 		ID int
 	}
@@ -460,6 +479,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type NestedStruct2 struct {
 		ID  int
 		BID int
@@ -522,6 +542,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 
@@ -552,6 +573,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 
 func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type NestedStruct3 struct{}
 
 	type TestStruct struct {
@@ -595,6 +617,7 @@ func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 
 func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type SimpleStruct5 struct {
 		Name       string
 		Occupation string
@@ -668,6 +691,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 
 func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type SimpleStruct6 struct {
 		Name       string
 		Occupation string
@@ -805,6 +829,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ComplexStruct1
 		expected  []ComplexStruct1
@@ -1041,6 +1066,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ComplexStruct2
 		expected  []ComplexStruct2
@@ -1234,6 +1260,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ComplexStruct3
 		expected  []ComplexStruct3
@@ -1494,6 +1521,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 
 func TestAddDeepFilters_AddsDeepFiltersMultipleLayersOfNesting(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ComplexStruct3
 		expected  []ComplexStruct3
@@ -1703,6 +1731,7 @@ func TestAddDeepFilters_AddsDeepFiltersMultipleLayersOfNesting(t *testing.T) {
 
 func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records          []*ComplexStruct3
 		filterMap        []map[string]any
@@ -1859,6 +1888,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 
 func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records          []*ManyA
 		filterMap        []map[string]any
@@ -1931,6 +1961,7 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) 
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnSingleFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ManyA
 		expected  []ManyA
@@ -2170,6 +2201,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnSingleFilter(t *testing.T
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnMultiFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ManyA
 		expected  []ManyA
@@ -2489,6 +2521,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnMultiFilter(t *testing.T)
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type Tag struct {
 		ID    uuid.UUID
 		Key   string
@@ -2640,6 +2673,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type Tag struct {
 		ID    uuid.UUID
 		Key   string
@@ -2838,4 +2872,9 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			}
 		})
 	}
+}
+
+func cleanupCache() {
+	cacheDatabaseMap = tsyncmap.Map[string, map[string]*nestedType]{}
+	schemaCache = sync.Map{}
 }
