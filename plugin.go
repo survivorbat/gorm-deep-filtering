@@ -32,8 +32,6 @@ func queryCallback(db *gorm.DB) {
 	}
 
 	createDeepFilterRecursively(exp.Exprs, db)
-
-	return
 }
 
 func createDeepFilterRecursively(exprs []clause.Expression, db *gorm.DB) {

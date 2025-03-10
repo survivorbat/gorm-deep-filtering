@@ -1705,7 +1705,7 @@ func TestAddDeepFilters_AddsDeepFiltersMultipleLayersOfNesting(t *testing.T) {
 			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
-			err := database.AutoMigrate(&TagValue{}, &Tag{}, &ComplexStruct3{})
+			_ = database.AutoMigrate(&TagValue{}, &Tag{}, &ComplexStruct3{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
