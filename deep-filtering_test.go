@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/survivorbat/go-tsyncmap"
 	"gorm.io/gorm/clause"
 )
 
@@ -2875,6 +2874,6 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 }
 
 func cleanupCache() {
-	cacheDatabaseMap = tsyncmap.Map[string, map[string]*nestedType]{}
-	schemaCache = sync.Map{}
+	cacheDatabaseMap.Clear()
+	schemaCache.Clear()
 }
