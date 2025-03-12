@@ -1,6 +1,8 @@
 module github.com/survivorbat/gorm-deep-filtering
 
-go 1.20
+go 1.23.0
+
+toolchain go1.23.5
 
 require (
 	github.com/google/uuid v1.3.0
@@ -18,6 +20,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
