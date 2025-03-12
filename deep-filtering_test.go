@@ -2,14 +2,16 @@ package deepgorm
 
 import (
 	"fmt"
-	"github.com/ing-bank/gormtestutil"
-	"gorm.io/gorm/schema"
 	"reflect"
 	"sync"
 	"testing"
 
+	"github.com/ing-bank/gormtestutil"
+	"gorm.io/gorm/schema"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm/clause"
 )
 
@@ -41,10 +43,57 @@ type ManyB struct {
 	ManyAs []*ManyA `gorm:"many2many:a_b"`
 }
 
+type TagValue struct {
+	ID    uuid.UUID
+	Value string
+}
+
+type Tag struct {
+	ID               uuid.UUID
+	Key              string
+	Value            string
+	ComplexStructRef uuid.UUID
+	TagValueRef      uuid.UUID
+	TagValue         *TagValue `gorm:"foreignKey:TagValueRef"`
+}
+
+type SimpleTag struct {
+	ID               uuid.UUID
+	Key              string
+	Value            string
+	ComplexStructRef uuid.UUID
+}
+
+type NestedStruct4 struct {
+	ID         uuid.UUID
+	Name       string
+	Occupation string
+}
+
+type ComplexStruct1 struct {
+	ID        uuid.UUID
+	Value     int
+	Nested    *NestedStruct4 `gorm:"foreignKey:NestedRef"`
+	NestedRef uuid.UUID
+}
+
+type ComplexStruct2 struct {
+	ID   uuid.UUID
+	Name string
+	Tags []*SimpleTag `gorm:"foreignKey:ComplexStructRef"`
+}
+
+type ComplexStruct3 struct {
+	ID   uuid.UUID
+	Name string
+	Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
+}
+
 // Tests
 
 func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct1 struct {
 		//nolint
@@ -66,6 +115,7 @@ func TestGetDatabaseFieldsOfType_DoesNotReturnSimpleTypes(t *testing.T) {
 
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeFields(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct2 struct {
 		ID         int
@@ -100,6 +150,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeFields(t *testing.T) {
 
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeOfSliceFields(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct3 struct {
 		ID                int
@@ -134,6 +185,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeOfSliceFields(t *testing.T) {
 
 func TestGetDatabaseFieldsOfType_ReturnsStructTypeFieldsOnConsecutiveCalls(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type SimpleStruct4 struct {
 		Name       string
@@ -166,6 +218,7 @@ func TestGetDatabaseFieldsOfType_ReturnsStructTypeFieldsOnConsecutiveCalls(t *te
 
 func TestEnsureConcrete_TurnsTypeTestAIntoValue(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 	reflectPointer := reflect.TypeOf(&TestA{})
@@ -181,6 +234,7 @@ func TestEnsureConcrete_TurnsTypeTestAIntoValue(t *testing.T) {
 
 func TestEnsureConcrete_TurnsTypeTestBIntoValue(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectPointer := reflect.TypeOf(&TestB{})
@@ -196,6 +250,7 @@ func TestEnsureConcrete_TurnsTypeTestBIntoValue(t *testing.T) {
 
 func TestEnsureConcrete_TurnsTypeTestAIntoValueWithMultiplePointers(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 
@@ -216,6 +271,7 @@ func TestEnsureConcrete_TurnsTypeTestAIntoValueWithMultiplePointers(t *testing.T
 
 func TestEnsureConcrete_LeavesValueOfTypeTestAAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 	reflectValue := reflect.TypeOf(TestA{})
@@ -229,6 +285,7 @@ func TestEnsureConcrete_LeavesValueOfTypeTestAAlone(t *testing.T) {
 
 func TestEnsureConcrete_LeavesValueOfTypeTestBAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf(TestB{})
@@ -242,6 +299,7 @@ func TestEnsureConcrete_LeavesValueOfTypeTestBAlone(t *testing.T) {
 
 func TestEnsureNotASlice_LeavesValueOfTypeTestAAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestA struct{}
 	reflectValue := reflect.TypeOf([]*TestA{})
@@ -256,6 +314,7 @@ func TestEnsureNotASlice_LeavesValueOfTypeTestAAlone(t *testing.T) {
 
 func TestEnsureNotASlice_LeavesValueOfTypeTestBAlone(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf(TestB{})
@@ -269,6 +328,7 @@ func TestEnsureNotASlice_LeavesValueOfTypeTestBAlone(t *testing.T) {
 
 func TestEnsureNotASlice_ReturnsExpectedType(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf([]TestB{})
@@ -283,6 +343,7 @@ func TestEnsureNotASlice_ReturnsExpectedType(t *testing.T) {
 
 func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSlice(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf([][][][][][][][][][]TestB{})
@@ -297,6 +358,7 @@ func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSlice(t *testing.T) {
 
 func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSliceAndPointers(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestB struct{}
 	reflectValue := reflect.TypeOf([]*[][]*[]*[][]*[]*[][]*[]*TestB{})
@@ -311,6 +373,7 @@ func TestEnsureNotASlice_ReturnsExpectedTypeOnDeepSliceAndPointers(t *testing.T)
 
 func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnStruct(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestStruct struct{}
 	input := reflect.TypeOf(TestStruct{})
@@ -325,6 +388,7 @@ func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnStruct(t *tes
 
 func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnSlice(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	type TestStruct struct{}
 	input := reflect.TypeOf([]TestStruct{})
@@ -339,6 +403,7 @@ func TestGetInstanceAndValueTypeInfoOfField_ReturnsExpectedStructOnSlice(t *test
 
 func TestGetInstanceAndValueTypeInfoOfField_ReturnsNilOnNonStructUnknownType(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	input := reflect.TypeOf(0)
 
@@ -352,6 +417,7 @@ func TestGetInstanceAndValueTypeInfoOfField_ReturnsNilOnNonStructUnknownType(t *
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type NestedStruct1 struct {
 		ID int
 	}
@@ -412,6 +478,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnOneToMany(t *testing.T) {
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type NestedStruct2 struct {
 		ID  int
 		BID int
@@ -474,6 +541,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToOne(t *testing.T) {
 
 func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	// Arrange
 	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
 
@@ -504,6 +572,7 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 
 func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type NestedStruct3 struct{}
 
 	type TestStruct struct {
@@ -547,6 +616,7 @@ func TestGetNestedType_ReturnsErrorOnNoForeignKeys(t *testing.T) {
 
 func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type SimpleStruct5 struct {
 		Name       string
 		Occupation string
@@ -556,6 +626,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 		records   []*SimpleStruct5
 		filterMap map[string]any
 		fieldName string
+		tableName string
 	}{
 		"first": {
 			records: []*SimpleStruct5{
@@ -572,6 +643,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 				"probation": map[string]any{},
 			},
 			fieldName: "probation",
+			tableName: "simple_struct5",
 		},
 		"second": {
 			records: []*SimpleStruct5{
@@ -588,6 +660,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 				"does_not_exist": map[string]any{},
 			},
 			fieldName: "does_not_exist",
+			tableName: "simple_struct5",
 		},
 	}
 
@@ -608,7 +681,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 			assert.Nil(t, query)
 
 			if assert.NotNil(t, err) {
-				expectedError := fmt.Sprintf("field '%v' does not exist", testData.fieldName)
+				expectedError := fmt.Sprintf("failed to add filters for '%s.%s': field does not exist", testData.tableName, testData.fieldName)
 				assert.Equal(t, expectedError, err.Error())
 			}
 		})
@@ -617,6 +690,7 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 
 func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type SimpleStruct6 struct {
 		Name       string
 		Occupation string
@@ -754,19 +828,7 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 	t.Parallel()
-	type NestedStruct4 struct {
-		ID         uuid.UUID
-		Name       string
-		Occupation string
-	}
-
-	type ComplexStruct1 struct {
-		ID        uuid.UUID
-		Value     int
-		Nested    *NestedStruct4 `gorm:"foreignKey:NestedRef"`
-		NestedRef uuid.UUID
-	}
-
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ComplexStruct1
 		expected  []ComplexStruct1
@@ -1003,19 +1065,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithOneToMany(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T) {
 	t.Parallel()
-	type Tag struct {
-		ID               uuid.UUID
-		Key              string
-		Value            string
-		ComplexStructRef uuid.UUID
-	}
-
-	type ComplexStruct2 struct {
-		ID   uuid.UUID
-		Name string
-		Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
-	}
-
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ComplexStruct2
 		expected  []ComplexStruct2
@@ -1026,7 +1076,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1038,7 +1088,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
 					Name: "Go",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1052,7 +1102,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
 					Name: "Python",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1074,7 +1124,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1086,7 +1136,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1098,7 +1148,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
 					Name: "Ruby",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
@@ -1112,7 +1162,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1124,7 +1174,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1146,7 +1196,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
 					Name: "Typescript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
@@ -1158,7 +1208,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 				{
 					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
 					Name: "Javascript",
-					Tags: []*Tag{
+					Tags: []*SimpleTag{
 						{
 							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
@@ -1184,7 +1234,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
-			_ = database.AutoMigrate(&ComplexStruct2{}, &Tag{})
+			_ = database.AutoMigrate(&ComplexStruct2{}, &SimpleTag{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
 
@@ -1209,19 +1259,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnSingleFilter(t *testing.T)
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) {
 	t.Parallel()
-	type Tag struct {
-		ID               uuid.UUID
-		Key              string
-		Value            string
-		ComplexStructRef uuid.UUID
-	}
-
-	type ComplexStruct3 struct {
-		ID   uuid.UUID
-		Name string
-		Tags []*Tag `gorm:"foreignKey:ComplexStructRef"`
-	}
-
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ComplexStruct3
 		expected  []ComplexStruct3
@@ -1238,6 +1276,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "type",
 							Value:            "interpreted",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+								Value: "test-python-value",
+							},
 						},
 					},
 				},
@@ -1250,6 +1292,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 							Key:              "type",
 							Value:            "compiled",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-go-value",
+							},
 						},
 					},
 				},
@@ -1264,6 +1310,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "type",
 							Value:            "interpreted",
+							TagValueRef:      uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
 						},
 					},
 				},
@@ -1291,12 +1338,20 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 						{
 							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "not-like",
 							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
 						},
 					},
 				},
@@ -1309,6 +1364,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 					},
 				},
@@ -1321,12 +1380,20 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 							Key:              "type",
 							Value:            "interpret",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e01390c4-485d-459f-958a-3d264659a70d"),
+								Value: "test-ruby-value",
+							},
 						},
 						{
 							ID:               uuid.MustParse("8927cd8b-ebb8-4119-93d5-cbe605d8f668"),
 							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
 							Key:              "not-like",
 							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
 						},
 					},
 				},
@@ -1341,12 +1408,14 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValueRef:      uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
 						},
 						{
 							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "not-like",
 							Value:            "python",
+							TagValueRef:      uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
 						},
 					},
 				},
@@ -1377,6 +1446,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 					},
 				},
@@ -1389,6 +1462,10 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
 							Key:              "like",
 							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
 						},
 					},
 				},
@@ -1429,6 +1506,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 
 			if assert.NotNil(t, query) {
 				var result []ComplexStruct3
+
 				res := query.Preload(clause.Associations).Find(&result)
 
 				// Handle error
@@ -1440,8 +1518,449 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToOneOnMultiFilter(t *testing.T) 
 	}
 }
 
+func TestAddDeepFilters_AddsDeepFiltersMultipleLayersOfNesting(t *testing.T) {
+	t.Parallel()
+	t.Cleanup(cleanupCache)
+	tests := map[string]struct {
+		records   []*ComplexStruct3
+		expected  []ComplexStruct3
+		filterMap []map[string]any
+	}{
+		"single query": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					Name: "Python",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "type",
+							Value:            "interpreted",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
+					Name: "Go",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "compiled",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e75a2f7e-0e1c-4f9c-a8ce-af90f1b64baa"),
+								Value: "test-go-value",
+							},
+						},
+					},
+				},
+			},
+			expected: []ComplexStruct3{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					Name: "Python",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "type",
+							Value:            "interpreted",
+							TagValueRef:      uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"value": "test-python-value",
+						},
+					},
+				},
+			},
+		},
+		"multi query": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
+					Name: "Typescript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
+					Name: "Javascript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
+					Name: "Ruby",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "interpret",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e01390c4-485d-459f-958a-3d264659a70d"),
+								Value: "test-ruby-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8927cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+			},
+			expected: []ComplexStruct3{
+				{
+					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
+					Name: "Typescript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValueRef:      uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+						},
+						{
+							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValueRef:      uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"value": "test-python-value",
+						},
+					},
+				},
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"value": "test-js-value",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			_ = database.AutoMigrate(&TagValue{}, &Tag{}, &ComplexStruct3{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			query, err := AddDeepFilters(database, ComplexStruct3{}, testData.filterMap...)
+
+			// Assert
+			assert.Nil(t, err)
+
+			if assert.NotNil(t, query) {
+				var result []ComplexStruct3
+
+				res := query.Preload(clause.Associations).Find(&result)
+
+				// Handle error
+				assert.Nil(t, res.Error)
+
+				assert.EqualValues(t, testData.expected, result)
+			}
+		})
+	}
+}
+
+func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
+	t.Parallel()
+	t.Cleanup(cleanupCache)
+	tests := map[string]struct {
+		records          []*ComplexStruct3
+		filterMap        []map[string]any
+		expectedErrorMsg string
+	}{
+		"one to many filter": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					Name: "Python",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "type",
+							Value:            "interpreted",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
+					Name: "Go",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "compiled",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e75a2f7e-0e1c-4f9c-a8ce-af90f1b64baa"),
+								Value: "test-go-value",
+							},
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"key": "test-python-value",
+						},
+					},
+				},
+			},
+			expectedErrorMsg: "failed to add filters for 'tag_values.key': field does not exist",
+		},
+		"many to one filter": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"), // A
+					Name: "Typescript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("451d635a-83f2-47da-b12c-50ec49e45509"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8977cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("411ed385-c1ca-432d-b577-6d6138450264"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // BObject
+					Name: "Javascript",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "like",
+							Value:            "javascript",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("a825637d-9eae-4855-9ee3-a69f1ee65a46"),
+								Value: "test-js-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // C
+					Name: "Ruby",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "interpret",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e01390c4-485d-459f-958a-3d264659a70d"),
+								Value: "test-ruby-value",
+							},
+						},
+						{
+							ID:               uuid.MustParse("8927cd8b-ebb8-4119-93d5-cbe605d8f668"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "not-like",
+							Value:            "python",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("db712c68-7faf-416d-b361-db77c8307c2b"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_key": map[string]any{
+							"value": "test-python-value",
+						},
+					},
+				},
+			},
+			expectedErrorMsg: "failed to add filters for 'tags.tag_key': field does not exist",
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			_ = database.AutoMigrate(&ComplexStruct3{}, &Tag{}, &TagValue{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			_, err := AddDeepFilters(database, ComplexStruct3{}, testData.filterMap...)
+
+			// Assert
+			require.ErrorContains(t, err, testData.expectedErrorMsg)
+		})
+	}
+}
+
+func TestAddDeepFilters_ReturnsErrorOnNonExistingFieldsManyToMany(t *testing.T) {
+	t.Parallel()
+	t.Cleanup(cleanupCache)
+	tests := map[string]struct {
+		records          []*ManyA
+		filterMap        []map[string]any
+		expectedErrorMsg string
+	}{
+		"simple filter": {
+			records: []*ManyA{
+				{
+					ID: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					A:  "hello",
+					ManyBs: []*ManyB{
+						{
+							ID: uuid.MustParse("9f1baf72-6ca5-4d43-8a01-d845575620e1"),
+							B:  "world",
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"many_bs": map[string]any{
+						"a": "world",
+					},
+				},
+			},
+			expectedErrorMsg: "failed to add filters for 'many_bs.a': field does not exist",
+		},
+		"nested filter": {
+			records: []*ManyA{
+				{
+					ID: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					A:  "hello",
+					ManyBs: []*ManyB{
+						{
+							ID: uuid.MustParse("9f1baf72-6ca5-4d43-8a01-d845575620e1"),
+							B:  "world",
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"many_b": map[string]any{
+						"b": "world",
+					},
+				},
+			},
+			expectedErrorMsg: "failed to add filters for 'many_as.many_b': field does not exist",
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			_ = database.AutoMigrate(&ManyA{}, &ManyB{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			_, err := AddDeepFilters(database, ManyA{}, testData.filterMap...)
+
+			// Assert
+			require.ErrorContains(t, err, testData.expectedErrorMsg)
+		})
+	}
+}
+
 func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnSingleFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ManyA
 		expected  []ManyA
@@ -1681,6 +2200,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnSingleFilter(t *testing.T
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnMultiFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	tests := map[string]struct {
 		records   []*ManyA
 		expected  []ManyA
@@ -2000,6 +2520,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToManyOnMultiFilter(t *testing.T)
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type Tag struct {
 		ID    uuid.UUID
 		Key   string
@@ -2151,6 +2672,7 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2(t *testing.T) {
 
 func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(cleanupCache)
 	type Tag struct {
 		ID    uuid.UUID
 		Key   string
@@ -2349,4 +2871,9 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 			}
 		})
 	}
+}
+
+func cleanupCache() {
+	cacheDatabaseMap.Clear()
+	schemaCache.Clear()
 }
