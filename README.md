@@ -47,9 +47,11 @@ import (
 
 func main() {
 	db, _ := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
-	
+
 	// Adds deep filtering
-	db.Use(deepgorm.New())
+	if err := db.Use(deepgorm.New()); err != nil {
+		panic(err.Error())
+	}
 }
 
 ```
