@@ -108,7 +108,7 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 				if _, ok := schemaInfo.FieldsByDBName[fieldName]; !ok {
 					return nil, fmt.Errorf("failed to add filters for '%s.%s': %w", schemaInfo.Table, fieldName, ErrFieldDoesNotExist)
 				}
-				simpleFilter[schemaInfo.Table+"."+fieldName] = givenFilter
+				simpleFilter[fieldName] = givenFilter
 			}
 		}
 	}
