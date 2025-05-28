@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	"github.com/ing-bank/gormtestutil"
+	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+
+	gormqonvert "github.com/survivorbat/gorm-query-convert"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -688,6 +691,332 @@ func TestAddDeepFilters_ReturnsErrorOnUnknownFieldInformation(t *testing.T) {
 	}
 }
 
+func TestAddDeepFilters_AddsSimplelFiltersWithFunctions(t *testing.T) {
+	// t.Parallel()
+	t.Cleanup(cleanupCache)
+	type SimpleStruct6 struct {
+		Name       string
+		Occupation string
+	}
+
+	tests := map[string]struct {
+		records       []*SimpleStruct6
+		expected      []*SimpleStruct6
+		filters       []map[string]any
+		expectedQuery string
+	}{
+		"simple filter": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"LOWER(UPPER(occupation))": "ops",
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (LOWER(UPPER(occupation)) = 'ops')",
+		},
+		"simple like filter": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"LOWER(occupation)": "~op",
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (LOWER(occupation) LIKE '%op%')",
+		},
+		"simple like filter with or": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"LOWER(occupation)": []string{"~op", "~de"},
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (LOWER(occupation) LIKE '%op%' OR LOWER(occupation) LIKE '%de%')",
+		},
+		"and filter with qonvert": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"occupation": "Ops",
+				},
+				{
+					"LENGTH(name)": ">4",
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (LENGTH(name) > 4) AND `simple_struct6`.`occupation` = \"Ops\"",
+		},
+		"simple or filter strings": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"UPPER(occupation)": []string{"OPS", "DEV"},
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (UPPER(occupation) = 'OPS' OR UPPER(occupation) = 'DEV')",
+		},
+		"simple or filter int": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"LENGTH(name)": []int{4, 8},
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (LENGTH(name) = 4 OR LENGTH(name) = 8)",
+		},
+		"or and filter with convert": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"UPPER(occupation)": []string{"OPS", "DEV"},
+				},
+				{
+					"LENGTH(name)": []string{"<=4", ">8"},
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (UPPER(occupation) = 'OPS' OR UPPER(occupation) = 'DEV') AND (LENGTH(name) <= 4 OR LENGTH(name) > 8)",
+		},
+		"simple filter with like prefix": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"UPPER(name)": []string{"~J"},
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (UPPER(name) LIKE '%J%')",
+		},
+		"simple or filter with like prefix": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"UPPER(occupation)": []string{"~EV", "~OP"},
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (UPPER(occupation) LIKE '%EV%' OR UPPER(occupation) LIKE '%OP%')",
+		},
+		"and or filter with like prefix": {
+			records: []*SimpleStruct6{
+				{
+					Occupation: "Dev",
+					Name:       "John",
+				},
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			expected: []*SimpleStruct6{
+				{
+					Occupation: "Ops",
+					Name:       "Jennifer",
+				},
+			},
+			filters: []map[string]any{
+				{
+					"UPPER(occupation)": []string{"!=DEV", "!~TEST"},
+				},
+				{
+					"LENGTH(name)": []int{3, 8},
+				},
+			},
+			expectedQuery: "SELECT * FROM `simple_struct6` WHERE (UPPER(occupation) != 'DEV' OR UPPER(occupation) NOT LIKE '%TEST%') AND (LENGTH(name) = 3 OR LENGTH(name) = 8)",
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			// t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			database.Use(gormqonvert.New(gormqonvert.CharacterConfig{
+				GreaterThanPrefix:      ">",
+				GreaterOrEqualToPrefix: ">=",
+				LessThanPrefix:         "<",
+				LessOrEqualToPrefix:    "<=",
+				NotEqualToPrefix:       "!=",
+				LikePrefix:             "~",
+				NotLikePrefix:          "!~",
+			}))
+			_ = database.AutoMigrate(&SimpleStruct6{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			sqlQuery := database.ToSQL(func(tx *gorm.DB) *gorm.DB {
+				deepFilterQuery, err := AddDeepFilters(tx, SimpleStruct6{}, testData.filters...)
+				assert.Nil(t, err)
+				return deepFilterQuery.Find([]*SimpleStruct6{})
+			})
+			query, err := AddDeepFilters(database, SimpleStruct6{}, testData.filters...)
+
+			// Assert
+			assert.Nil(t, err)
+
+			if assert.NotNil(t, query) {
+				var result []*SimpleStruct6
+				query.Preload(clause.Associations).Find(&result)
+
+				assert.EqualValues(t, testData.expected, result)
+				assert.Equal(t, testData.expectedQuery, sqlQuery)
+			}
+		})
+	}
+}
+
 func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 	t.Parallel()
 	t.Cleanup(cleanupCache)
@@ -806,6 +1135,15 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 			t.Parallel()
 			// Arrange
 			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			database.Use(gormqonvert.New(gormqonvert.CharacterConfig{
+				GreaterThanPrefix:      ">",
+				GreaterOrEqualToPrefix: ">=",
+				LessThanPrefix:         "<",
+				LessOrEqualToPrefix:    "<=",
+				NotEqualToPrefix:       "!=",
+				LikePrefix:             "~",
+				NotLikePrefix:          "!~",
+			}))
 			_ = database.AutoMigrate(&SimpleStruct6{})
 
 			database.CreateInBatches(testData.records, len(testData.records))
@@ -821,6 +1159,267 @@ func TestAddDeepFilters_AddsSimpleFilters(t *testing.T) {
 				query.Preload(clause.Associations).Find(&result)
 
 				assert.EqualValues(t, result, testData.expected)
+			}
+		})
+	}
+}
+
+func TestAddDeepFilters_AddsDeepFiltersWithOneToManyWithFunctions(t *testing.T) {
+	t.Parallel()
+	t.Cleanup(cleanupCache)
+	tests := map[string]struct {
+		records       []*ComplexStruct1
+		expected      []ComplexStruct1
+		filters       []map[string]any
+		expectedQuery string
+	}{
+		"simple filter with function": {
+			records: []*ComplexStruct1{
+				{
+					ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+					Value:     1,
+					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+						Name:       "Johan",
+						Occupation: "Dev",
+					},
+				},
+				{
+					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+					Value:     11,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Katherina",
+						Occupation: "Dev",
+					},
+				},
+			},
+			expected: []ComplexStruct1{
+				{
+					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+					Value:     11,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Katherina",
+						Occupation: "Dev",
+					},
+				},
+			},
+			filters: []map[string]any{
+				{
+					"nested": map[string]any{
+						"LOWER(UPPER(name))": "katherina",
+					},
+				},
+			},
+			expectedQuery: "SELECT * FROM `complex_struct1` WHERE nested_ref IN (SELECT `id` FROM `nested_struct4` WHERE (LOWER(UPPER(name)) = 'katherina'))",
+		},
+		"more complex query with simple filter function": {
+			records: []*ComplexStruct1{
+				{
+					ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+					Value:     1,
+					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+						Name:       "Johan",
+						Occupation: "Dev",
+					},
+				},
+				{
+					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+					Value:     11,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Katherina",
+						Occupation: "Dev",
+					},
+				},
+			},
+			expected: []ComplexStruct1{
+				{
+					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+					Value:     11,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Katherina",
+						Occupation: "Dev",
+					},
+				},
+			},
+			filters: []map[string]any{
+				{
+					"nested": map[string]any{
+						"UPPER(name)": "KATHERINA",
+					},
+					"value": 11,
+				},
+			},
+			expectedQuery: "SELECT * FROM `complex_struct1` WHERE nested_ref IN (SELECT `id` FROM `nested_struct4` WHERE (UPPER(name) = 'KATHERINA')) AND `complex_struct1`.`value` = 11",
+		},
+		"or query with function": {
+			records: []*ComplexStruct1{
+				{
+					ID:        uuid.MustParse("c98dc9f2-bfa5-4ab5-9cbb-76800e09e512"),
+					Value:     4,
+					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+						Name:       "Vanessa",
+						Occupation: "Ops",
+					},
+				},
+				{
+					ID:        uuid.MustParse("2ad6a4fe-e0a4-4791-8f10-df6317cdb8b5"),
+					Value:     193,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Vanessa",
+						Occupation: "Dev",
+					},
+				},
+				{
+					ID:        uuid.MustParse("5cc022ae-43a1-44d8-8ab5-31350e68d0b1"),
+					Value:     1593,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c5"), // C
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c5"), // C
+						Name:       "Derek",
+						Occupation: "Dev",
+					},
+				},
+			},
+			expected: []ComplexStruct1{
+				{
+					ID:        uuid.MustParse("c98dc9f2-bfa5-4ab5-9cbb-76800e09e512"),
+					Value:     4,
+					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+						Name:       "Vanessa",
+						Occupation: "Ops",
+					},
+				},
+				{
+					ID:        uuid.MustParse("2ad6a4fe-e0a4-4791-8f10-df6317cdb8b5"),
+					Value:     193,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Vanessa",
+						Occupation: "Dev",
+					},
+				},
+			},
+			filters: []map[string]any{
+				{
+					"nested": map[string]any{
+						"LOWER(name)": "vanessa",
+					},
+				},
+				{
+					"nested": map[string]any{
+						"UPPER(occupation)": []string{"DEV", "OPS"},
+					},
+				},
+			},
+			expectedQuery: "SELECT * FROM `complex_struct1` WHERE nested_ref IN (SELECT `id` FROM `nested_struct4` WHERE (LOWER(name) = 'vanessa')) AND nested_ref IN (SELECT `id` FROM `nested_struct4` WHERE (UPPER(occupation) = 'DEV' OR UPPER(occupation) = 'OPS'))",
+		},
+		"query with qonvert and function": {
+			records: []*ComplexStruct1{
+				{
+					ID:        uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+					Value:     1,
+					NestedRef: uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("71766db4-eb17-4457-a85c-8b89af5a319d"), // A
+						Name:       "Coat",
+						Occupation: "Product Owner",
+					},
+				},
+				{
+					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+					Value:     2,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Joke",
+						Occupation: "Ops",
+					},
+				},
+			},
+			expected: []ComplexStruct1{
+				{
+					ID:        uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+					Value:     2,
+					NestedRef: uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+					Nested: &NestedStruct4{
+						ID:         uuid.MustParse("4604bb79-ee05-4a09-b874-c3af8964d8c4"), // BObject
+						Name:       "Joke",
+						Occupation: "Ops",
+					},
+				},
+			},
+			filters: []map[string]any{
+				{
+					"nested": map[string]any{
+						"UPPER(name)":        []string{"~OK", "~AT"},
+						"LENGTH(occupation)": ">=3",
+					},
+					"value": 2,
+				},
+			},
+			expectedQuery: "SELECT * FROM `complex_struct1` WHERE nested_ref IN (SELECT `id` FROM `nested_struct4` WHERE (UPPER(name) LIKE '%OK%' OR UPPER(name) LIKE '%AT%') AND (LENGTH(occupation) >= 3)) AND `complex_struct1`.`value` = 2",
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			database.Use(gormqonvert.New(gormqonvert.CharacterConfig{
+				GreaterThanPrefix:      ">",
+				GreaterOrEqualToPrefix: ">=",
+				LessThanPrefix:         "<",
+				LessOrEqualToPrefix:    "<=",
+				NotEqualToPrefix:       "!=",
+				LikePrefix:             "~",
+				NotLikePrefix:          "!~",
+			}))
+			_ = database.AutoMigrate(&ComplexStruct1{}, &NestedStruct4{})
+
+			// Crate records
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			sqlQuery := database.ToSQL(func(tx *gorm.DB) *gorm.DB {
+				deepFilterQuery, _ := AddDeepFilters(tx, ComplexStruct1{}, testData.filters...)
+				return deepFilterQuery.Find(&ComplexStruct1{})
+			})
+			query, err := AddDeepFilters(database, ComplexStruct1{}, testData.filters...)
+
+			// Assert
+			assert.Nil(t, err)
+
+			if assert.NotNil(t, query) {
+				var result []ComplexStruct1
+				res := query.Preload(clause.Associations).Find(&result)
+
+				// Handle error
+				assert.Nil(t, res.Error)
+
+				assert.Equal(t, testData.expected, result)
+				assert.Equal(t, testData.expectedQuery, sqlQuery)
 			}
 		})
 	}
@@ -1776,6 +2375,52 @@ func TestAddDeepFilters_ReturnsErrorOnNonExistingFields(t *testing.T) {
 					"tags": map[string]any{
 						"tag_value": map[string]any{
 							"key": "test-python-value",
+						},
+					},
+				},
+			},
+			expectedErrorMsg: "failed to add filters for 'tag_values.key': field does not exist",
+		},
+		"one to many filter with function": {
+			records: []*ComplexStruct3{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"), // A
+					Name: "Python",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("1c83a7c9-e95d-4dba-b858-5eb4e34ebcf2"),
+							ComplexStructRef: uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+							Key:              "type",
+							Value:            "interpreted",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("38769e29-e945-451f-a551-3e5811a5d363"),
+								Value: "test-python-value",
+							},
+						},
+					},
+				},
+				{
+					ID:   uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"), // BObject
+					Name: "Go",
+					Tags: []*Tag{
+						{
+							ID:               uuid.MustParse("17983ba8-2d26-4e36-bb6b-6c5a04b6606e"),
+							ComplexStructRef: uuid.MustParse("23292d51-4768-4c41-8475-6d4c9f0c6f69"),
+							Key:              "type",
+							Value:            "compiled",
+							TagValue: &TagValue{
+								ID:    uuid.MustParse("e75a2f7e-0e1c-4f9c-a8ce-af90f1b64baa"),
+								Value: "test-go-value",
+							},
+						},
+					},
+				},
+			},
+			filterMap: []map[string]any{
+				{
+					"tags": map[string]any{
+						"tag_value": map[string]any{
+							"LOWER(key)": "test-python-value",
 						},
 					},
 				},
