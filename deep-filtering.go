@@ -126,6 +126,10 @@ func AddDeepFilters(db *gorm.DB, objectType any, filters ...map[string]any) (*go
 type nestedType struct {
 	// An empty instance of the object, used in db.Model(...)
 	fieldStructInstance any
+	// The primary key column of fieldStructInstance.
+	fieldPrimaryKey string
+	// The primary key column of the current model being filtered.
+	currentPrimaryKey string
 	fieldForeignKey     string
 
 	// Whether this is a manyToOne, oneToMany or manyToMany. oneToOne is taken care of automatically.
@@ -203,28 +207,83 @@ func getNestedType(naming schema.Namer, dbField *schema.Field, ofType reflect.Ty
 		fieldStructInstance: sourceStructType,
 	}
 
-	sourceForeignKey, ok := dbField.TagSettings["FOREIGNKEY"]
-	if ok {
-		result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, sourceForeignKey)
-		return result, nil
+	if len(dbField.Schema.PrimaryFields) > 0 {
+		result.currentPrimaryKey = dbField.Schema.PrimaryFields[0].DBName
 	}
 
-	// No foreign key found, then it must be a manyToMany
-	manyToMany, ok := dbField.TagSettings["MANY2MANY"]
+	if relatedSchema, err := schema.Parse(sourceStructType, &schemaCache, naming); err == nil && len(relatedSchema.PrimaryFields) > 0 {
+		result.fieldPrimaryKey = relatedSchema.PrimaryFields[0].DBName
+	}
 
-	if !ok {
+	relation := dbField.Schema.Relationships.Relations[dbField.Name]
+
+	// Detetct many2many and foreignkey at the same time (fields can have both defined)
+	sourceForeignKey, sourceForeignKeyOk := dbField.TagSettings["FOREIGNKEY"]
+	manyToMany, manyToManyOk := dbField.TagSettings["MANY2MANY"]
+
+	if !sourceForeignKeyOk && !manyToManyOk {
 		return nil, fmt.Errorf("no 'foreignKey:...' or 'many2many:...' found in field %s", dbField.Name)
+	}
+
+	// Only foreignkey
+	if sourceForeignKeyOk && !manyToManyOk {
+		if sourceField := dbField.Schema.LookUpField(sourceForeignKey); sourceField != nil {
+			result.fieldForeignKey = sourceField.DBName
+		} else {
+			result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, sourceForeignKey)
+		}
+
+		if relation != nil && len(relation.References) > 0 {
+			result.fieldPrimaryKey = relation.References[0].PrimaryKey.DBName
+		}
+
+		return result, nil
 	}
 
 	// Woah it's a many-to-many!
 	result.relationType = "manyToMany"
 	result.manyToManyTable = manyToMany
 
+	if relation != nil {
+		for _, ref := range relation.References {
+			if ref.OwnPrimaryKey {
+				result.destinationManyToManyForeignKey = ref.ForeignKey.DBName
+				result.currentPrimaryKey = ref.PrimaryKey.DBName
+				continue
+			}
+
+			result.fieldForeignKey = ref.ForeignKey.DBName
+			result.fieldPrimaryKey = ref.PrimaryKey.DBName
+		}
+	}
+
 	// Based on the type we can just put _id behind it, again this only works with simple many-to-many structs
-	result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, ensureNotASlice(dbField.FieldType).Name()) + "_id"
+	if result.fieldForeignKey == "" {
+		fieldForeignKey, ok := dbField.TagSettings["JOINREFERENCES"]
+		if ok {
+			if sourceField := dbField.Schema.LookUpField(fieldForeignKey); sourceField != nil {
+				result.fieldForeignKey = sourceField.DBName
+			} else {
+				result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, fieldForeignKey)
+			}
+		} else {
+			result.fieldForeignKey = naming.ColumnName(dbField.Schema.Table, ensureNotASlice(dbField.FieldType).Name()) + "_id"
+		}
+	}
 
 	// Now the other table that we're getting information from.
-	result.destinationManyToManyForeignKey = naming.ColumnName(dbField.Schema.Table, ofType.Name()) + "_id"
+	if result.destinationManyToManyForeignKey == "" {
+		destinationManyToManyForeignKey, ok := dbField.TagSettings["JOINFOREIGNKEY"]
+		if ok {
+			if destinationField := dbField.Schema.LookUpField(destinationManyToManyForeignKey); destinationField != nil {
+				result.destinationManyToManyForeignKey = destinationField.DBName
+			} else {
+				result.destinationManyToManyForeignKey = naming.ColumnName(dbField.Schema.Table, destinationManyToManyForeignKey)
+			}
+		} else if ofType != nil {
+			result.destinationManyToManyForeignKey = naming.ColumnName(dbField.Schema.Table, ofType.Name()) + "_id"
+		}
+	}
 
 	return result, nil
 }
@@ -256,7 +315,7 @@ func getNestedType(naming schema.Namer, dbField *schema.Field, ofType reflect.Ty
 func getDatabaseFieldsOfType(naming schema.Namer, schemaInfo *schema.Schema) map[string]*nestedType {
 	// First get all the information of the to-be-reflected object
 	reflectType := ensureConcrete(schemaInfo.ModelType)
-	reflectTypeName := reflectType.Name()
+	reflectTypeName := reflectType.String()
 
 	// The len(dbFields) check is needed here because when running the unit tests
 	// it fell into a race condition where it had the map key already stored but not the value yet.
@@ -302,7 +361,7 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 			return nil, err
 		}
 
-		return db.Where(whereQuery, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery)), nil
+		return db.Where(whereQuery, cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldPrimaryKey).Where(subQuery)), nil
 
 	case "manyToOne":
 		// SELECT * FROM <table> WHERE id IN (SELECT fieldInfo.fieldStructInstance FROM fieldInfo.fieldStructInstance WHERE filter)
@@ -312,7 +371,7 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 			return nil, err
 		}
 
-		return db.Where("id IN (?)", cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldForeignKey).Where(subQuery)), nil
+		return db.Where(fmt.Sprintf("%s IN (?)", fieldInfo.currentPrimaryKey), cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldForeignKey).Where(subQuery)), nil
 
 	case "manyToMany":
 		// SELECT * FROM <table> WHERE id IN (SELECT <table>_id FROM fieldInfo.fieldForeignKey WHERE <other_table>_id IN (SELECT id FROM <other_table> WHERE givenFilter))
@@ -325,7 +384,7 @@ func addDeepFilter(db *gorm.DB, fieldInfo *nestedType, filter any) (*gorm.DB, er
 			return nil, err
 		}
 
-		return db.Where("id IN (?)", cleanDB.Table(fieldInfo.manyToManyTable).Select(fieldInfo.destinationManyToManyForeignKey).Where(subWhere, cleanDB.Model(fieldInfo.fieldStructInstance).Select("id").Where(subQuery))), nil
+		return db.Where(fmt.Sprintf("%s IN (?)", fieldInfo.currentPrimaryKey), cleanDB.Table(fieldInfo.manyToManyTable).Select(fieldInfo.destinationManyToManyForeignKey).Where(subWhere, cleanDB.Model(fieldInfo.fieldStructInstance).Select(fieldInfo.fieldPrimaryKey).Where(subQuery))), nil
 	}
 
 	return nil, fmt.Errorf("relationType '%s' unknown", fieldInfo.relationType)

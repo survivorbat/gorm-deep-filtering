@@ -553,6 +553,8 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 	// This is what ManyA should return
 	expected := &nestedType{
 		fieldStructInstance:             &ManyB{},
+		fieldPrimaryKey:                 "id",
+		currentPrimaryKey:               "id",
 		fieldForeignKey:                 "many_b_id",
 		relationType:                    "manyToMany",
 		manyToManyTable:                 "a_b",
@@ -565,6 +567,53 @@ func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToMany(t *testing.T) {
 	// Assert
 	assert.Nil(t, err)
 
+	if assert.NotNil(t, result) {
+		assert.EqualValues(t, expected, result)
+	}
+}
+
+func TestGetNestedType_ReturnsExpectedTypeInfoOnManyToManyWithCustomColumns(t *testing.T) {
+	t.Parallel()
+	t.Cleanup(cleanupCache)
+
+	type End struct {
+		ID    uuid.UUID `gorm:"column:endId;primaryKey"`
+		Value string    `gorm:"column:endValue"`
+	}
+
+	type Middle struct {
+		ID         uuid.UUID `gorm:"column:middleId;primaryKey"`
+		ResourceID uuid.UUID `gorm:"column:resourceIdJ"`
+		EndID      uuid.UUID `gorm:"column:endIdJ"`
+	}
+
+	type Resource struct {
+		ID   uuid.UUID `gorm:"column:resourceId;primaryKey"`
+		Name string    `gorm:"column:resourceName"`
+		Ends []*End    `gorm:"foreignKey:ID;many2many:middles;joinForeignKey:ResourceID;references:ID;joinReferences:EndID"`
+	}
+
+	naming := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name())).NamingStrategy
+
+	schemaInfo, _ := schema.Parse(Resource{}, &sync.Map{}, naming)
+	field := schemaInfo.FieldsByName["Ends"]
+
+	inputType := reflect.TypeOf(Resource{})
+
+	// This is what Resource should return
+	expected := &nestedType{
+		fieldStructInstance:             &End{},
+		fieldPrimaryKey:                 "endId",
+		currentPrimaryKey:               "resourceId",
+		fieldForeignKey:                 "end_id",
+		relationType:                    "manyToMany",
+		manyToManyTable:                 "middles",
+		destinationManyToManyForeignKey: "resource_id",
+	}
+
+	result, err := getNestedType(naming, field, inputType)
+
+	assert.Nil(t, err)
 	if assert.NotNil(t, result) {
 		assert.EqualValues(t, expected, result)
 	}
@@ -2868,6 +2917,100 @@ func TestAddDeepFilters_AddsDeepFiltersWithManyToMany2OnMultiFilter(t *testing.T
 				assert.Nil(t, res.Error)
 
 				assert.EqualValues(t, testData.expected, result)
+			}
+		})
+	}
+}
+
+func TestAddDeepFilters_AddsDeepFiltersWithManyToManyCustomColumns(t *testing.T) {
+	t.Parallel()
+	t.Cleanup(cleanupCache)
+
+	type End struct {
+		ID    uuid.UUID `gorm:"column:endId;primaryKey"`
+		Value string    `gorm:"column:endValue"`
+	}
+
+	type Resource struct {
+		ID   uuid.UUID `gorm:"column:resourceId;primaryKey"`
+		Name string    `gorm:"column:resourceName"`
+		Ends []*End    `gorm:"foreignKey:ID;many2many:resource_ends;references:ID"`
+	}
+
+	tests := map[string]struct {
+		records   []*Resource
+		expected  []Resource
+		filterMap map[string]any
+	}{
+		"looking for 1 resource": {
+			records: []*Resource{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+					Name: "TestResource",
+					Ends: []*End{
+						{
+							ID:    uuid.MustParse("c53184d8-e506-49f4-af18-93fb370f6df2"),
+							Value: "InfraNL",
+						},
+						{
+							ID:    uuid.MustParse("4de16d5f-c10f-4206-b6ce-c14997341113"),
+							Value: "Blub",
+						},
+					},
+				},
+			},
+			expected: []Resource{
+				{
+					ID:   uuid.MustParse("59aa5a8f-c5de-44fa-9355-080650481687"),
+					Name: "TestResource",
+					Ends: []*End{
+						{
+							ID:    uuid.MustParse("c53184d8-e506-49f4-af18-93fb370f6df2"),
+							Value: "InfraNL",
+						},
+						{
+							ID:    uuid.MustParse("4de16d5f-c10f-4206-b6ce-c14997341113"),
+							Value: "Blub",
+						},
+					},
+				},
+			},
+			filterMap: map[string]any{
+				"ends": map[string]any{
+					"endValue": "InfraNL",
+				},
+			},
+		},
+	}
+
+	for name, testData := range tests {
+		testData := testData
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Arrange
+			database := gormtestutil.NewMemoryDatabase(t, gormtestutil.WithName(t.Name()))
+			_ = database.AutoMigrate(&Resource{}, &End{})
+
+			database.CreateInBatches(testData.records, len(testData.records))
+
+			// Act
+			query, err := AddDeepFilters(database, Resource{}, testData.filterMap)
+
+			// Assert
+			assert.Nil(t, err)
+
+			if assert.NotNil(t, query) {
+				var result []Resource
+				res := query.Preload(clause.Associations).Find(&result)
+
+				// Handle error
+				assert.Nil(t, res.Error)
+
+				if assert.Len(t, result, 1) {
+					assert.Equal(t, testData.expected[0].ID, result[0].ID)
+					assert.Equal(t, testData.expected[0].Name, result[0].Name)
+					assert.ElementsMatch(t, testData.expected[0].Ends, result[0].Ends)
+				}
 			}
 		})
 	}
